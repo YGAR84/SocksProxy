@@ -23,13 +23,6 @@ public class FirstPhaseConnection extends PhaseConnection
     @Override
     public void perform(SelectionKey key) throws IOException
     {
-
-        if(!key.isValid())
-        {
-            System.out.println("INVALID LUL?");
-            return;
-        }
-
         if(key.isValid() && key.isReadable())
         {
             channel.read(buffer);
@@ -39,14 +32,13 @@ public class FirstPhaseConnection extends PhaseConnection
             {
                 if(buffer.get(0) != 0x05) { terminate(key); }
 
-                System.out.println("I'm here");
+//                System.out.println("I'm here");
 
                 int numOfModes = (int)buffer.get(1);
-                System.out.println("Num of modes: " + numOfModes);
+//                System.out.println("Num of modes: " + numOfModes);
                 if(buffer.position() > 2 + numOfModes) { terminate(key); }
                 else if(buffer.position() == 2 + numOfModes)
                 {
-                    System.out.println("JIJA");
                     boolean hasAuth = false;
                     for(int i = 2; i <= buffer.position(); ++i)
                     {
@@ -58,23 +50,24 @@ public class FirstPhaseConnection extends PhaseConnection
 
                     System.out.println("Has auth: " + hasAuth);
                     createAnswer(hasAuth);
+
+                    key.cancel();
+                    connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
                 }
-            }
-            else
-            {
-                //TODO
             }
         }
 
-        if(key.isValid() && key.isWritable() && answerIsReady)
+        if(key.isValid() && key.isWritable())
         {
-            System.out.println("Send Answer");
 
             channel.write(ByteBuffer.wrap(answer));
 
-            SecondPhaseConnection secondPhaseConnection = new SecondPhaseConnection(connectionSelector, channel);
+            key.cancel();
 
-            connectionSelector.addConnection(channel, secondPhaseConnection);
+            SecondPhaseConnection secondPhaseConnection = new SecondPhaseConnection(connectionSelector, channel);
+            connectionSelector.registerConnection(channel, secondPhaseConnection, SelectionKey.OP_READ);
+
+//            connectionSelector.addConnection(channel, secondPhaseConnection);
         }
 
         //connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ | SelectionKey.OP_WRITE);

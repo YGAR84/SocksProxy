@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.util.HashMap;
@@ -53,8 +54,6 @@ public class DNSConnection extends Connection
             channel = DatagramChannel.open();
             channel.configureBlocking(false);
 
-            connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-
             ResolverConfig resolverConfig = new ResolverConfig();
 
 //            System.out.println("Size: " + resolverConfig.servers().size());
@@ -77,8 +76,9 @@ public class DNSConnection extends Connection
 
     }
 
-    public void resolveAddress(byte[] address, SecondPhaseConnection connection) throws org.xbill.DNS.TextParseException
+    public void resolveAddress(byte[] address, SecondPhaseConnection connection) throws org.xbill.DNS.TextParseException, ClosedChannelException
     {
+        connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
         int id = 1;
         while(true)
         {
@@ -106,15 +106,13 @@ public class DNSConnection extends Connection
     public void perform(SelectionKey key) throws IOException
     {
 
-        if(!key.isValid()) return;
-
-        if(key.isWritable() && (messageMap.size() != 0))
+        if(key.isValid() && key.isWritable() && (messageMap.size() != 0))
         {
             Map.Entry<Integer, Message> record = messageMap.entrySet().iterator().next();
             channel.send(ByteBuffer.wrap(record.getValue().toWire()), dnsRequestAddres);
         }
 
-        if(key.isReadable() && (messageMap.size() != 0))
+        if(key.isValid() && key.isReadable() && (messageMap.size() != 0))
         {
             channel.read(buffer);
             byte[] resp = new byte[buffer.position() + 1];

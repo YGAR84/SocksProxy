@@ -35,11 +35,10 @@ public class ServerConnection extends Connection
 
             if(socketChannel != null)
             {
-                System.out.println("ACCEPTED");
                 socketChannel.configureBlocking(false);
 
-                connectionSelector.registerConnection(socketChannel, new FirstPhaseConnection(connectionSelector, socketChannel),
-                        SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+                connectionSelector.registerConnection(socketChannel,
+                                    new FirstPhaseConnection(connectionSelector, socketChannel), SelectionKey.OP_READ);
             }
         }
     }

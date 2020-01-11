@@ -12,7 +12,6 @@ public abstract class Connection
 
     public Connection(ConnectionSelector _connectionSelector)
     {
-        System.out.println("It works");
         connectionSelector = _connectionSelector;
     }
 

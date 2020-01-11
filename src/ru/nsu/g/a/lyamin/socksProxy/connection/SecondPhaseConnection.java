@@ -5,16 +5,17 @@ import ru.nsu.g.a.lyamin.socksProxy.ConnectionSelector;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
 
 public class SecondPhaseConnection extends PhaseConnection
 {
-
     private boolean answerIsReady = false;
     private ByteBuffer buffer = ByteBuffer.wrap(new byte[263]);
 
@@ -39,22 +40,22 @@ public class SecondPhaseConnection extends PhaseConnection
     @Override
     public void perform(SelectionKey key) throws IOException
     {
-        if(!key.isValid()) return;
-
-
-        if(ipResolved)
-        {
-            createAnswer();
-        }
-
-        if(key.isReadable() && !answerIsReady)
+        if(key.isValid() && key.isReadable())
         {
             /*int readed = */channel.read(buffer);
             if(buffer.position() >= 5)
             {
-                if(buffer.get(0) != 0x05) { error = 0x07; createAnswer();/*terminate(key);*/ }
+                if(buffer.get(0) != 0x05)
+                {
+                    error = 0x07;
+                    createAnswer();
+                }
 
-                else if(buffer.get(1) != 0x01 || buffer.get(2) != 0x00) { error = 0x07; createAnswer(); }
+                else if(buffer.get(1) != 0x01 || buffer.get(2) != 0x00)
+                {
+                    error = 0x07;
+                    createAnswer();
+                }
 
                 else
                 {
@@ -72,7 +73,6 @@ public class SecondPhaseConnection extends PhaseConnection
                         {
                             error = 0x07;
                             createAnswer();
-                            //terminate(key);
                         }
                         else if( buffer.position() == 10)
                         {
@@ -80,7 +80,6 @@ public class SecondPhaseConnection extends PhaseConnection
                             addressBytes = new byte[4];
                             System.arraycopy(buffer.array(), 4, addressBytes, 0, addressBytes.length);
                             ip = parseIpFromBytes(addressBytes);
-                            createAnswer();
                         }
                     }
                     else if(addressType == 0x03)
@@ -105,7 +104,6 @@ public class SecondPhaseConnection extends PhaseConnection
                     {
                         error = 0x07;
                         createAnswer();
-                        //terminate(key);
                     }
 
                 }
@@ -114,10 +112,21 @@ public class SecondPhaseConnection extends PhaseConnection
                 System.arraycopy(buffer.array(), buffer.position() - 2, portBytes, 0, 2);
 
                 port = bytesToPort(portBytes);
+
+                if(isIp)
+                {
+                    SocketChannel socketChannel = SocketChannel.open();
+                    PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(ip, port));
+                }
+                else
+                {
+                    DNSConnection dnsConnection = DNSConnection.getInstance();
+                    dnsConnection.resolveAddress(addressBytes, this);
+                }
             }
         }
 
-        if(key.isWritable() && answerIsReady)
+        if(key.isValid() && key.isWritable())
         {
 
             channel.write(ByteBuffer.wrap(answer));
@@ -132,9 +141,6 @@ public class SecondPhaseConnection extends PhaseConnection
 //            }
 
             connectionChannel.configureBlocking(false);
-
-
-
 
             //System.out.println(ip.getHostName() + ":" + port);
             //connectionChannel.connect(new InetSocketAddress(ip, port));
@@ -167,23 +173,31 @@ public class SecondPhaseConnection extends PhaseConnection
         }
     }
 
+    public void setIsConnected(boolean flag) throws ClosedChannelException
+    {
+        if(!flag)
+        {
+            error = 0x04;
+        }
+
+        createAnswer();
+    }
+
     private boolean hasError()
     {
         return error != (byte) 0x00;
     }
 
-    private void createAnswer()
+    private void createAnswer() throws ClosedChannelException
     {
 
+        connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
+
         answerIsReady = true;
-        InetSocketAddress localAddress = null;
         InetSocketAddress remoteAddress = null;
         try
         {
             remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
-            localAddress = (InetSocketAddress) channel.getLocalAddress();
-            System.out.println("Local address: " + localAddress.toString());
-            System.out.println("Remote address: " + remoteAddress.toString());
         }
         catch (IOException ignored)
         {
@@ -282,9 +296,20 @@ public class SecondPhaseConnection extends PhaseConnection
         ip = _ip;
     }
 
-    public void setIpResolved(boolean _ipResolved)
+    public void setIpResolved(boolean _ipResolved) throws IOException
     {
+
         ipResolved = _ipResolved;
+
+        if(!ipResolved)
+        {
+            error = 0x04;
+            createAnswer();
+            return;
+        }
+
+        SocketChannel socketChannel = SocketChannel.open();
+        PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(ip, port));
     }
 
     public byte[] getAddressBytes()
