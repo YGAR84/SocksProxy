@@ -47,13 +47,13 @@ public class ConnectionSelector
 
     public void iterateOverConnections() throws IOException
     {
-        selector.select(1000);
+        selector.select();
 
         Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
-//        int size = selectedKeys.size();
-//        if(size >= 2)
-//            System.out.println("size: " + size);
+        int size = selectedKeys.size();
+        if(size >= 2)
+            System.out.println("size: " + size);
 
         Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
 
@@ -61,8 +61,8 @@ public class ConnectionSelector
         {
             SelectionKey key = keyIterator.next();
 
-//            if(size >= 2)
-//                System.out.println("a: " + key.isAcceptable() + "; r: " + key.isReadable() + " ; w: " + key.isWritable() + " ; v: " + key.isValid());
+            if(size >= 2)
+                System.out.println("a: " + key.isAcceptable() + "; r: " + key.isReadable() + " ; w: " + key.isWritable() + " ; v: " + key.isValid());
 
             Connection connection = connectionMap.get(key.channel());
             if(connection != null)

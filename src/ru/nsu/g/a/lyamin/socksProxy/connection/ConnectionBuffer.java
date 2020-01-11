@@ -1,6 +1,7 @@
 package ru.nsu.g.a.lyamin.socksProxy.connection;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
@@ -10,32 +11,30 @@ public class ConnectionBuffer
 
     private byte[] buffer = new byte[capacity];
 
-    private int size = 0;
-    private int free = capacity;
-    private int head = 0;
-    private int tail = 0;
+    private int writeOffset = 0;
+    private int readOffset = 0;
 
     private ByteBuffer[] getByteBuffersArrayToRead()
     {
-        if(head < tail)
+        if(writeOffset < readOffset)
         {
             ByteBuffer result[] = new ByteBuffer[1];
-            result[0] = ByteBuffer.wrap(buffer, head + 1, tail - head - 1);
+            result[0] = ByteBuffer.wrap(buffer, writeOffset, readOffset - writeOffset);
             return result;
         }
         else
         {
-            if(tail == 0)
+            if(readOffset == 0)
             {
                 ByteBuffer result[] = new ByteBuffer[1];
-                result[0] = ByteBuffer.wrap(buffer, head + 1, capacity - head - 1);
+                result[0] = ByteBuffer.wrap(buffer, writeOffset, capacity - writeOffset);
                 return result;
             }
             else
             {
                 ByteBuffer result[] = new ByteBuffer[2];
-                result[0] = ByteBuffer.wrap(buffer, head + 1, capacity - head - 1);
-                result[1] = ByteBuffer.wrap(buffer, 0, tail - 1);
+                result[0] = ByteBuffer.wrap(buffer, writeOffset, capacity - writeOffset);
+                result[1] = ByteBuffer.wrap(buffer, 0, readOffset);
                 return result;
             }
 
@@ -44,50 +43,50 @@ public class ConnectionBuffer
 
     private ByteBuffer[] getByteBuffersArrayToWrite()
     {
-        if(head < tail)
+        if(writeOffset < readOffset)
         {
             ByteBuffer result[] = new ByteBuffer[2];
-            result[0] = ByteBuffer.wrap(buffer, tail, capacity - tail);
-            result[1] = ByteBuffer.wrap(buffer, 0, head);
+            result[0] = ByteBuffer.wrap(buffer, readOffset, capacity - readOffset);
+            result[1] = ByteBuffer.wrap(buffer, 0, writeOffset);
             return result;
         }
         else
         {
             ByteBuffer result[] = new ByteBuffer[1];
-            result[0] = ByteBuffer.wrap(buffer, tail, head - tail + 1);
+            result[0] = ByteBuffer.wrap(buffer, readOffset, writeOffset - readOffset);
             return result;
-//            if(tail == 0)
+//            if(readOffset == 0)
 //            {
 //                ByteBuffer result[] = new ByteBuffer[1];
-//                result[0] = ByteBuffer.wrap(buffer, head, size - head - 1);
+//                result[0] = ByteBuffer.wrap(buffer, writeOffset, size - writeOffset - 1);
 //                return result;
 //            }
 //            else
 //            {
 //                ByteBuffer result[] = new ByteBuffer[2];
-//                result[0] = ByteBuffer.wrap(buffer, head, size - head - 1);
-//                result[1] = ByteBuffer.wrap(buffer, 0, tail);
+//                result[0] = ByteBuffer.wrap(buffer, writeOffset, size - writeOffset - 1);
+//                result[1] = ByteBuffer.wrap(buffer, 0, readOffset);
 //                return result;
 //            }
         }
     }
 
-    public void readFromChannel(SocketChannel channel) throws IOException
+    public void readFromChannelToBuffer(SocketChannel channel) throws IOException
     {
         ByteBuffer buffers[] = getByteBuffersArrayToRead();
 
         long readen = channel.read(buffers);
 
-        head = (head + (int)readen) % capacity;
+        writeOffset = (writeOffset + (int)readen) % capacity;
     }
 
-    public void writeToChannel(SocketChannel channel) throws IOException
+    public void writeToChannelFromBuffer(SocketChannel channel) throws IOException
     {
         ByteBuffer buffers[] = getByteBuffersArrayToWrite();
 
         long written = channel.write(buffers);
 
-        tail = (tail + (int)written) % capacity;
+        readOffset = (readOffset + (int)written) % capacity;
     }
 
 }

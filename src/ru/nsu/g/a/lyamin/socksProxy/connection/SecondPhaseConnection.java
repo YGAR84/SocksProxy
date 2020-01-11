@@ -126,7 +126,13 @@ public class SecondPhaseConnection extends PhaseConnection
             SocketChannel connectionChannel = SocketChannel.open();
 
             connectionChannel.configureBlocking(false);
-            connectionChannel.bind(new InetSocketAddress(ip, port));
+
+
+            System.out.println(ip.getHostName() + ":" + port);
+            connectionChannel.connect(new InetSocketAddress(ip, port));
+
+
+            //connectionChannel.bind(new InetSocketAddress(ip, port));
 
             ConnectionBuffer firstBuffer = new ConnectionBuffer();
             ConnectionBuffer secondBuffer = new ConnectionBuffer();
@@ -134,7 +140,7 @@ public class SecondPhaseConnection extends PhaseConnection
             DirectConnection directConnection1 = new DirectConnection(connectionSelector, channel, firstBuffer, secondBuffer);
             DirectConnection directConnection2 = new DirectConnection(connectionSelector, connectionChannel, secondBuffer, firstBuffer);
 
-            connectionSelector.addConnection(channel, directConnection1);
+            connectionSelector.registerConnection(channel, directConnection1, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
             connectionSelector.registerConnection(connectionChannel, directConnection2, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
 //
@@ -161,9 +167,13 @@ public class SecondPhaseConnection extends PhaseConnection
 
         answerIsReady = true;
         InetSocketAddress localAddress = null;
+        InetSocketAddress remoteAddress = null;
         try
         {
+            remoteAddress = (InetSocketAddress) channel.getRemoteAddress();
             localAddress = (InetSocketAddress) channel.getLocalAddress();
+            System.out.println("Local address: " + localAddress.toString());
+            System.out.println("Remote address: " + remoteAddress.toString());
         }
         catch (IOException ignored)
         {
@@ -181,8 +191,8 @@ public class SecondPhaseConnection extends PhaseConnection
 
         answer[3] = (byte) 0x01;
 
-        InetAddress localIP = localAddress.getAddress();
-        short localPort = (short)localAddress.getPort();
+        InetAddress localIP = remoteAddress.getAddress();
+        int localPort = remoteAddress.getPort();
 
         byte[] ipBytes = inetAddressToBytes(localIP);
 
@@ -199,7 +209,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
         System.out.println(Arrays.toString(portBytes));
 
-        short getNewLocalProPort = bytesToPort(portBytes);
+        int getNewLocalProPort = bytesToPort(portBytes);
 
         System.out.println(getNewLocalProPort);
 
@@ -228,18 +238,21 @@ public class SecondPhaseConnection extends PhaseConnection
         return ip.getAddress();
     }
 
-    private byte[] portToBytes(short port)
+    private byte[] portToBytes(int port)
     {
         byte[] result = new byte[2];
 
-        ByteBuffer.wrap(result).putShort(port);
+        result[1] = (byte)(port % 256);
+        result[0] = (byte)(port / 256);
+
+        //ByteBuffer.wrap(result).putInt(port);
 
         return result;
     }
 
-    private short bytesToPort(byte[] portBytes)
+    private int bytesToPort(byte[] portBytes)
     {
-        return ByteBuffer.wrap(portBytes).getShort();
+        return (portBytes[0] + portBytes[1] * 256);
     }
 
     public void setIp(InetAddress _ip)

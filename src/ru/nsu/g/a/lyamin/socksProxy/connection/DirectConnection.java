@@ -9,16 +9,16 @@ import java.nio.channels.SocketChannel;
 public class DirectConnection extends Connection
 {
     private SocketChannel channel;
-    private ConnectionBuffer bufferToRead;
-    private ConnectionBuffer bufferToWrite;
+    private ConnectionBuffer bufferToReadFrom;
+    private ConnectionBuffer bufferToWriteTo;
 
 
     public DirectConnection(ConnectionSelector connectionSelector, SocketChannel _channel, ConnectionBuffer _bufferToRead, ConnectionBuffer _bufferToWrite)
     {
         super(connectionSelector);
         channel = _channel;
-        bufferToRead = _bufferToRead;
-        bufferToWrite = _bufferToWrite;
+        bufferToReadFrom = _bufferToRead;
+        bufferToWriteTo = _bufferToWrite;
     }
 
     @Override
@@ -33,7 +33,7 @@ public class DirectConnection extends Connection
         {
             try
             {
-                bufferToWrite.readFromChannel(channel);
+                bufferToWriteTo.readFromChannelToBuffer(channel);
             }
             catch (IOException e)
             {
@@ -45,14 +45,12 @@ public class DirectConnection extends Connection
         {
             try
             {
-                bufferToRead.writeToChannel(channel);
+                bufferToReadFrom.writeToChannelFromBuffer(channel);
             }
             catch (IOException e)
             {
                 e.printStackTrace();
             }
         }
-
-
     }
 }
