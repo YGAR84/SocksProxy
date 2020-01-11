@@ -1,7 +1,6 @@
 package ru.nsu.g.a.lyamin.socksProxy.connection;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
@@ -13,6 +12,8 @@ public class ConnectionBuffer
 
     private int writeOffset = 0;
     private int readOffset = 0;
+
+    private boolean shutdown = false;
 
     private ByteBuffer[] getByteBuffersArrayToRead()
     {
@@ -71,13 +72,21 @@ public class ConnectionBuffer
         }
     }
 
-    public void readFromChannelToBuffer(SocketChannel channel) throws IOException
+    public boolean readFromChannelToBuffer(SocketChannel channel) throws IOException
     {
         ByteBuffer buffers[] = getByteBuffersArrayToRead();
 
         long readen = channel.read(buffers);
 
+        if(readen == -1)
+        {
+            System.out.println("EOF");
+            shutdown = true;
+            return false;
+        }
         writeOffset = (writeOffset + (int)readen) % capacity;
+
+        return true;
     }
 
     public void writeToChannelFromBuffer(SocketChannel channel) throws IOException
@@ -85,6 +94,12 @@ public class ConnectionBuffer
         ByteBuffer buffers[] = getByteBuffersArrayToWrite();
 
         long written = channel.write(buffers);
+
+        if(shutdown && (written == 0))
+        {
+            channel.shutdownOutput();
+            return;
+        }
 
         readOffset = (readOffset + (int)written) % capacity;
     }

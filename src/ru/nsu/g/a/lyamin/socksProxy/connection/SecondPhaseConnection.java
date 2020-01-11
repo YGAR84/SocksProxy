@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.Arrays;
@@ -123,14 +124,23 @@ public class SecondPhaseConnection extends PhaseConnection
 
             if(hasError()) {terminate(key);}
 
-            SocketChannel connectionChannel = SocketChannel.open();
+            SocketChannel connectionChannel = SocketChannel.open(new InetSocketAddress(ip, port));
+
+//            if(connectionChannel.isConnected())
+//            {
+//                System.out.println("CHI DA");
+//            }
 
             connectionChannel.configureBlocking(false);
 
 
-            System.out.println(ip.getHostName() + ":" + port);
-            connectionChannel.connect(new InetSocketAddress(ip, port));
 
+
+            //System.out.println(ip.getHostName() + ":" + port);
+            //connectionChannel.connect(new InetSocketAddress(ip, port));
+
+
+            //System.out.println("IS CONNECTED: " + connectionChannel.isConnected());
 
             //connectionChannel.bind(new InetSocketAddress(ip, port));
 
@@ -216,6 +226,8 @@ public class SecondPhaseConnection extends PhaseConnection
         answer[8] = portBytes[0];
         answer[9] = portBytes[1];
 
+        System.out.println(Arrays.toString(answer));
+
     }
 
     private InetAddress parseIpFromBytes(byte[] ipBytes)
@@ -240,19 +252,29 @@ public class SecondPhaseConnection extends PhaseConnection
 
     private byte[] portToBytes(int port)
     {
+        byte[] tmp = new byte[4];
+
+        ByteBuffer.wrap(tmp).order(ByteOrder.BIG_ENDIAN).putInt(port); //.array();
+
         byte[] result = new byte[2];
 
-        result[1] = (byte)(port % 256);
-        result[0] = (byte)(port / 256);
-
-        //ByteBuffer.wrap(result).putInt(port);
-
+        System.arraycopy(tmp, 2, result, 0, 2);
+//        result[1] = (byte)(port % 256);
+//        result[0] = (byte)(port / 256);
+//
+//        //ByteBuffer.wrap(result).putInt(port);
+//
         return result;
     }
 
     private int bytesToPort(byte[] portBytes)
     {
-        return (portBytes[0] + portBytes[1] * 256);
+        byte[] newPortBytes = new byte[4];
+        System.arraycopy(portBytes, 0, newPortBytes, 2, portBytes.length);
+
+        System.out.println(Arrays.toString(newPortBytes));
+        return ByteBuffer.wrap(newPortBytes).order(ByteOrder.BIG_ENDIAN).getInt();
+//        return (portBytes[0] + portBytes[1] * 256);
     }
 
     public void setIp(InetAddress _ip)

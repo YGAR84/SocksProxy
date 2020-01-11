@@ -35,12 +35,11 @@ public class ConnectionSelector
 
     public void registerConnection(AbstractSelectableChannel channel, Connection connection, int opts) throws ClosedChannelException
     {
-        System.out.println("is registered:" + channel.isRegistered() + " " + channel.isOpen());
-        if(!channel.isRegistered())
-        {
+//        System.out.println("is registered:" + channel.isRegistered() + " " + channel.isOpen());
+//        if(!channel.isRegistered())
+//        {
             channel.register(selector, opts);
-
-        }
+//        }
 
         connectionMap.put(channel, connection);
     }
@@ -52,8 +51,8 @@ public class ConnectionSelector
         Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
         int size = selectedKeys.size();
-        if(size >= 2)
-            System.out.println("size: " + size);
+//        if(size >= 2)
+//            System.out.println("size: " + size);
 
         Iterator<SelectionKey> keyIterator = selectedKeys.iterator();
 
@@ -61,8 +60,8 @@ public class ConnectionSelector
         {
             SelectionKey key = keyIterator.next();
 
-            if(size >= 2)
-                System.out.println("a: " + key.isAcceptable() + "; r: " + key.isReadable() + " ; w: " + key.isWritable() + " ; v: " + key.isValid());
+//            if(size >= 2)
+//                System.out.println("a: " + key.isAcceptable() + "; r: " + key.isReadable() + " ; w: " + key.isWritable() + " ; v: " + key.isValid());
 
             Connection connection = connectionMap.get(key.channel());
             if(connection != null)

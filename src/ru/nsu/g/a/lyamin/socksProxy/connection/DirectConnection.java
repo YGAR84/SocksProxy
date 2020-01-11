@@ -3,6 +3,8 @@ package ru.nsu.g.a.lyamin.socksProxy.connection;
 import ru.nsu.g.a.lyamin.socksProxy.ConnectionSelector;
 
 import java.io.IOException;
+import java.nio.channels.AsynchronousCloseException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
@@ -24,16 +26,16 @@ public class DirectConnection extends Connection
     @Override
     public void perform(SelectionKey key)
     {
-        if(!key.isValid())
-        {
-            terminate(key);
-        }
-
-        if(key.isReadable())
+        if(key.isValid() && key.isReadable())
         {
             try
             {
-                bufferToWriteTo.readFromChannelToBuffer(channel);
+                if(!bufferToWriteTo.readFromChannelToBuffer(channel))
+                {
+
+                    terminate(key);
+                    return;
+                }
             }
             catch (IOException e)
             {
@@ -41,11 +43,36 @@ public class DirectConnection extends Connection
             }
         }
 
-        if(key.isWritable())
+        if(key.isValid() && key.isWritable())
         {
             try
             {
                 bufferToReadFrom.writeToChannelFromBuffer(channel);
+            }
+            catch (AsynchronousCloseException eBoy)
+            {
+                try
+                {
+                    connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ);
+                }
+                catch (ClosedChannelException e)
+                {
+                    e.printStackTrace();
+                }
+            }
+            catch (IOException e)
+            {
+                e.printStackTrace();
+            }
+        }
+
+        if(key.isValid() && key.isConnectable())
+        {
+            try
+            {
+                channel.finishConnect();
+
+                connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
             }
             catch (IOException e)
             {
