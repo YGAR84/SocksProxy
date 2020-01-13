@@ -3,6 +3,7 @@ package ru.nsu.g.a.lyamin.socksProxy.connection;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
+import java.util.Arrays;
 
 public class ConnectionBuffer
 {
@@ -84,6 +85,16 @@ public class ConnectionBuffer
             shutdown = true;
             return false;
         }
+
+        System.out.println("DIRECT read: " + readen);
+        for(var v : buffers)
+        {
+            if(v.position() != 0)
+            {
+                System.out.println(Arrays.toString(v.array()));
+            }
+        }
+
         writeOffset = (writeOffset + (int)readen) % capacity;
 
         return true;

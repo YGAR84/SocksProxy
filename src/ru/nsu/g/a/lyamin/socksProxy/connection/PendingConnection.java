@@ -19,9 +19,30 @@ public class PendingConnection extends Connection
         channel = _channel;
         secondPhaseConnection = _secondPhaseConnection;
 
-        channel.connect(address);
+        System.out.println("PENDING CTOR");
 
-        connectionSelector.registerConnection(channel, this, SelectionKey.OP_CONNECT);
+        boolean connected;
+
+        try
+        {
+            connected = channel.connect(address);
+        }
+        catch(java.nio.channels.AlreadyConnectedException ignored)
+        {
+            secondPhaseConnection.setIsConnected(true, this);
+            return;
+        }
+
+
+        if(connected)
+        {
+            secondPhaseConnection.setIsConnected(true, this);
+        }
+        else
+        {
+            connectionSelector.registerConnection(channel, this, SelectionKey.OP_CONNECT);
+        }
+
     }
 
     @Override
@@ -31,9 +52,12 @@ public class PendingConnection extends Connection
         {
             boolean result = channel.finishConnect();
 
-            key.cancel();
-
-            secondPhaseConnection.setIsConnected(result);
+            secondPhaseConnection.setIsConnected(result, this);
         }
+    }
+
+    public SocketChannel getChannel()
+    {
+        return channel;
     }
 }

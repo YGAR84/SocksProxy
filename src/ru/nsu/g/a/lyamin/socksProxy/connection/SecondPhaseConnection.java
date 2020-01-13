@@ -5,7 +5,6 @@ import ru.nsu.g.a.lyamin.socksProxy.ConnectionSelector;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -16,14 +15,13 @@ import java.util.Arrays;
 
 public class SecondPhaseConnection extends PhaseConnection
 {
-    private boolean answerIsReady = false;
+    //private boolean answerIsReady = false;
     private ByteBuffer buffer = ByteBuffer.wrap(new byte[263]);
 
     private byte[] answer = new byte[10];
 
     private byte[] addressBytes;
 
-    private boolean ipResolved;
     private boolean isIp;
 
     private int port;
@@ -32,9 +30,14 @@ public class SecondPhaseConnection extends PhaseConnection
 
     private InetAddress ip;
 
+    private PendingConnection pendingConnection;
+
+    private int answerWrittenAll = 0;
+
     public SecondPhaseConnection(ConnectionSelector connectionSelector, SocketChannel channel)
     {
         super(connectionSelector, channel);
+        System.out.println("SECOND PHASE CTOR");
     }
 
     @Override
@@ -42,122 +45,125 @@ public class SecondPhaseConnection extends PhaseConnection
     {
         if(key.isValid() && key.isReadable())
         {
-            /*int readed = */channel.read(buffer);
-            if(buffer.position() >= 5)
+            int read = channel.read(buffer);
+            if(read != -1)
             {
-                if(buffer.get(0) != 0x05)
+                terminate(key);
+                return;
+            }
+
+            if(!checkReaden()) return;
+
+            byte[] secondPhaseRequest = new byte[buffer.position()];
+            System.arraycopy(buffer.array(), 0, secondPhaseRequest, 0, secondPhaseRequest.length);
+            System.out.println("SECOND PHASE REQUEST: " + Arrays.toString(secondPhaseRequest));
+
+            if(buffer.get(0) != 0x05)
+            {
+                error = 0x07;
+                createAnswer();
+                return;
+            }
+
+            if(buffer.get(1) != 0x01)
+            {
+                error = 0x05;
+                createAnswer();
+                return;
+            }
+
+            if(buffer.get(2) != 0x00)
+            {
+                error = 0x07;
+                createAnswer();
+                return;
+            }
+
+            byte addressType = buffer.get(3);
+
+            if(addressType == 0x01)
+            {
+                isIp = true;
+                addressBytes = new byte[4];
+                System.arraycopy(buffer.array(), 4, addressBytes, 0, addressBytes.length);
+                ip = parseIpFromBytes(addressBytes);
+
+                if(ip == null)
                 {
                     error = 0x07;
                     createAnswer();
-                }
-
-                else if(buffer.get(1) != 0x01 || buffer.get(2) != 0x00)
-                {
-                    error = 0x07;
-                    createAnswer();
-                }
-
-                else
-                {
-                    byte addressType = buffer.get(3);
-
-                    if(addressType == 0x04)
-                    {
-                        error = 0x08;
-                        createAnswer();
-                    }
-
-                    else if (addressType == 0x01)
-                    {
-                        if(buffer.position() > 10)
-                        {
-                            error = 0x07;
-                            createAnswer();
-                        }
-                        else if( buffer.position() == 10)
-                        {
-                            isIp = true;
-                            addressBytes = new byte[4];
-                            System.arraycopy(buffer.array(), 4, addressBytes, 0, addressBytes.length);
-                            ip = parseIpFromBytes(addressBytes);
-                        }
-                    }
-                    else if(addressType == 0x03)
-                    {
-                        int length = buffer.get(4);
-                        if(buffer.position() + 1 > 4 + 1 + length + 2)
-                        {
-                            error = 0x07;
-                            createAnswer();
-                            //terminate(key);
-                        }
-                        else if(buffer.position() + 1 == 4 + 1 + length + 2)
-                        {
-                            isIp = false;
-                            addressBytes = new byte[length];
-                            System.arraycopy(buffer.array(), 5, addressBytes, 0, length);
-                            DNSConnection dnsConnection = DNSConnection.getInstance();
-                            dnsConnection.resolveAddress(addressBytes, this);
-                        }
-                    }
-                    else
-                    {
-                        error = 0x07;
-                        createAnswer();
-                    }
-
-                }
-
-                byte[] portBytes = new byte[2];
-                System.arraycopy(buffer.array(), buffer.position() - 2, portBytes, 0, 2);
-
-                port = bytesToPort(portBytes);
-
-                if(isIp)
-                {
-                    SocketChannel socketChannel = SocketChannel.open();
-                    PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(ip, port));
-                }
-                else
-                {
-                    DNSConnection dnsConnection = DNSConnection.getInstance();
-                    dnsConnection.resolveAddress(addressBytes, this);
+                    return;
                 }
             }
+            else if(addressType == 0x03)
+            {
+                int length = buffer.get(4);
+                isIp = false;
+                addressBytes = new byte[length];
+                System.arraycopy(buffer.array(), 5, addressBytes, 0, length);
+            }
+            else if(addressType == 0x04)
+            {
+                error = 0x08;
+                createAnswer();
+                return;
+            }
+            else
+            {
+                error = 0x07;
+                createAnswer();
+                return;
+            }
+
+            byte[] portBytes = new byte[2];
+            System.arraycopy(buffer.array(), buffer.position() - 2, portBytes, 0, 2);
+
+            port = bytesToPort(portBytes);
+
+            if(isIp)
+            {
+                SocketChannel socketChannel = SocketChannel.open();
+                socketChannel.configureBlocking(false);
+                createPending(socketChannel, new InetSocketAddress(ip, port));
+
+            }
+            else
+            {
+                DNSConnection dnsConnection = DNSConnection.getInstance();
+                dnsConnection.resolveAddress(addressBytes, this);
+            }
+
+            key.cancel();
         }
 
         if(key.isValid() && key.isWritable())
         {
 
-            channel.write(ByteBuffer.wrap(answer));
+            int written = channel.write(ByteBuffer.wrap(answer));
 
-            if(hasError()) {terminate(key);}
+            answerWrittenAll += written;
 
-            SocketChannel connectionChannel = SocketChannel.open(new InetSocketAddress(ip, port));
+            if(answerWrittenAll != answer.length)
+            {
+                return;
+            }
 
-//            if(connectionChannel.isConnected())
-//            {
-//                System.out.println("CHI DA");
-//            }
+            System.out.println("SECOND PHASE ANSWER: " + Arrays.toString(answer));
 
-            connectionChannel.configureBlocking(false);
-
-            //System.out.println(ip.getHostName() + ":" + port);
-            //connectionChannel.connect(new InetSocketAddress(ip, port));
-
-
-            //System.out.println("IS CONNECTED: " + connectionChannel.isConnected());
-
-            //connectionChannel.bind(new InetSocketAddress(ip, port));
+            if(hasError()) { terminate(key); }
 
             ConnectionBuffer firstBuffer = new ConnectionBuffer();
             ConnectionBuffer secondBuffer = new ConnectionBuffer();
 
-            DirectConnection directConnection1 = new DirectConnection(connectionSelector, channel, firstBuffer, secondBuffer);
-            DirectConnection directConnection2 = new DirectConnection(connectionSelector, connectionChannel, secondBuffer, firstBuffer);
+            DirectConnection directConnection1 = new DirectConnection(connectionSelector, channel, firstBuffer,
+                                                                                                     secondBuffer);
+            DirectConnection directConnection2 = new DirectConnection(connectionSelector,
+                                                        pendingConnection.getChannel(), secondBuffer, firstBuffer);
 
-            connectionSelector.registerConnection(channel, directConnection1, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-            connectionSelector.registerConnection(connectionChannel, directConnection2, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+            connectionSelector.registerConnection(channel, directConnection1,
+                                                                SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+            connectionSelector.registerConnection(pendingConnection.getChannel(), directConnection2,
+                                                                SelectionKey.OP_READ | SelectionKey.OP_WRITE);
 
 //
 //            SocketChannel channel2 = SocketChannel.open();
@@ -173,14 +179,65 @@ public class SecondPhaseConnection extends PhaseConnection
         }
     }
 
-    public void setIsConnected(boolean flag) throws ClosedChannelException
+    private boolean checkReaden()
+    {
+        if(buffer.position() < 6) return false;
+
+        byte addressType = buffer.get(3);
+
+        if(addressType == 0x01)
+        {
+            return buffer.position() >= 4 + 4 + 2;
+        }
+        else if(addressType == 0x03)
+        {
+            int length = buffer.get(4);
+
+            return buffer.position() >= 4 + length + 2;
+        }
+
+        return true;
+    }
+
+    public void setIsConnected(boolean flag, PendingConnection _pendingConnection) throws ClosedChannelException
     {
         if(!flag)
         {
             error = 0x04;
         }
 
+        pendingConnection = _pendingConnection;
+
         createAnswer();
+    }
+
+    public void createPending(SocketChannel sc, InetSocketAddress isa) throws ClosedChannelException
+    {
+        try
+        {
+            new PendingConnection(connectionSelector, sc, this, isa);
+        }
+        catch(IOException ignored)
+        {
+            error = 0x03;
+            createAnswer();
+        }
+    }
+
+    public void setIpResolved(boolean ipResolved, InetAddress resolvedIp) throws IOException
+    {
+
+        if(!ipResolved)
+        {
+            error = 0x04;
+            createAnswer();
+            return;
+        }
+
+        SocketChannel socketChannel = SocketChannel.open();
+
+        createPending(socketChannel, new InetSocketAddress(resolvedIp, port));
+//        PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(resolvedIp, port));
     }
 
     private boolean hasError()
@@ -193,7 +250,6 @@ public class SecondPhaseConnection extends PhaseConnection
 
         connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
 
-        answerIsReady = true;
         InetSocketAddress remoteAddress = null;
         try
         {
@@ -209,7 +265,6 @@ public class SecondPhaseConnection extends PhaseConnection
         answer[2] = (byte) 0x00;
         if(hasError())
         {
-            answerIsReady = true;
             return;
         }
 
@@ -220,27 +275,11 @@ public class SecondPhaseConnection extends PhaseConnection
 
         byte[] ipBytes = inetAddressToBytes(localIP);
 
-
-
-        answer[4] = ipBytes[0];
-        answer[5] = ipBytes[1];
-        answer[6] = ipBytes[2];
-        answer[7] = ipBytes[3];
-
-        System.out.println(localPort);
+        System.arraycopy(ipBytes, 0, answer, 4, 4);
 
         byte[] portBytes = portToBytes(localPort);
 
-        System.out.println(Arrays.toString(portBytes));
-
-        int getNewLocalProPort = bytesToPort(portBytes);
-
-        System.out.println(getNewLocalProPort);
-
-        answer[8] = portBytes[0];
-        answer[9] = portBytes[1];
-
-        System.out.println(Arrays.toString(answer));
+        System.arraycopy(portBytes, 0, answer, 8, 2);
 
     }
 
@@ -268,16 +307,12 @@ public class SecondPhaseConnection extends PhaseConnection
     {
         byte[] tmp = new byte[4];
 
-        ByteBuffer.wrap(tmp).order(ByteOrder.BIG_ENDIAN).putInt(port); //.array();
+        ByteBuffer.wrap(tmp).order(ByteOrder.BIG_ENDIAN).putInt(port);
 
         byte[] result = new byte[2];
 
         System.arraycopy(tmp, 2, result, 0, 2);
-//        result[1] = (byte)(port % 256);
-//        result[0] = (byte)(port / 256);
-//
-//        //ByteBuffer.wrap(result).putInt(port);
-//
+
         return result;
     }
 
@@ -288,28 +323,6 @@ public class SecondPhaseConnection extends PhaseConnection
 
         System.out.println(Arrays.toString(newPortBytes));
         return ByteBuffer.wrap(newPortBytes).order(ByteOrder.BIG_ENDIAN).getInt();
-//        return (portBytes[0] + portBytes[1] * 256);
-    }
-
-    public void setIp(InetAddress _ip)
-    {
-        ip = _ip;
-    }
-
-    public void setIpResolved(boolean _ipResolved) throws IOException
-    {
-
-        ipResolved = _ipResolved;
-
-        if(!ipResolved)
-        {
-            error = 0x04;
-            createAnswer();
-            return;
-        }
-
-        SocketChannel socketChannel = SocketChannel.open();
-        PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(ip, port));
     }
 
     public byte[] getAddressBytes()
@@ -321,4 +334,102 @@ public class SecondPhaseConnection extends PhaseConnection
     {
         return port;
     }
+
+    @Override
+    public void terminate(SelectionKey key)
+    {
+        super.terminate(key);
+        try
+        {
+            channel.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
 }
+
+
+
+//            if(buffer.position() >= 5)
+//            {
+//                if(buffer.get(0) != 0x05)
+//                {
+//                    error = 0x07;
+//                    createAnswer();
+//                }
+//
+//                else if(buffer.get(1) != 0x01 || buffer.get(2) != 0x00)
+//                {
+//                    error = 0x07;
+//                    createAnswer();
+//                }
+//
+//                else
+//                {
+//                    byte addressType = buffer.get(3);
+//
+//                    if(addressType == 0x04)
+//                    {
+//                        error = 0x08;
+//                        createAnswer();
+//                    }
+//
+//                    else if (addressType == 0x01)
+//                    {
+//                        if(buffer.position() > 10)
+//                        {
+//                            error = 0x07;
+//                            createAnswer();
+//                        }
+//                        else if( buffer.position() == 10)
+//                        {
+//                            isIp = true;
+//                            addressBytes = new byte[4];
+//                            System.arraycopy(buffer.array(), 4, addressBytes, 0, addressBytes.length);
+//                            ip = parseIpFromBytes(addressBytes);
+//                        }
+//                    }
+//                    else if(addressType == 0x03)
+//                    {
+//                        int length = buffer.get(4);
+//                        if(buffer.position() > 4 + 1 + length + 2)
+//                        {
+//                            error = 0x07;
+//                            createAnswer();
+//                        }
+//                        else if(buffer.position() == 4 + 1 + length + 2)
+//                        {
+//                            isIp = false;
+//                            addressBytes = new byte[length];
+//                            System.arraycopy(buffer.array(), 5, addressBytes, 0, length);
+//                            DNSConnection dnsConnection = DNSConnection.getInstance();
+//                            dnsConnection.resolveAddress(addressBytes, this);
+//                        }
+//                    }
+//                    else
+//                    {
+//                        error = 0x07;
+//                        createAnswer();
+//                    }
+//
+//                }
+//
+//                byte[] portBytes = new byte[2];
+//                System.arraycopy(buffer.array(), buffer.position() - 2, portBytes, 0, 2);
+//
+//                port = bytesToPort(portBytes);
+//
+//                if(isIp)
+//                {
+//                    SocketChannel socketChannel = SocketChannel.open();
+//                    socketChannel.configureBlocking(false);
+//                    PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(ip, port));
+//                }
+//                else
+//                {
+//                    DNSConnection dnsConnection = DNSConnection.getInstance();
+//                    dnsConnection.resolveAddress(addressBytes, this);
+//                }
+//            }
