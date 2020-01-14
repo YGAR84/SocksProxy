@@ -8,43 +8,43 @@ import java.io.IOException;
 public class Server implements Runnable
 {
 
-    private final int timeout = 1000;
+	private final int timeout = 1000;
 
-    private ConnectionSelector connectionSelector;
+	private ConnectionSelector connectionSelector;
 
-    public Server(int port)
-    {
-        try
-        {
-            connectionSelector = new ConnectionSelector();
-            new ServerConnection(connectionSelector, port);
-            DNSConnection.createInstance(connectionSelector);
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        }
-    }
+	public Server(int port)
+	{
+		try
+		{
+			connectionSelector = new ConnectionSelector();
+			new ServerConnection(connectionSelector, port);
+			DNSConnection.createInstance(connectionSelector);
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
 
-    @Override
-    public void run()
-    {
-        try
-        {
-            while(!Thread.interrupted())
-            {
-                connectionSelector.iterateOverConnections();
-            }
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-            System.exit(-41);
-        }
-        finally
-        {
-            connectionSelector.shutdown();
-        }
-    }
+	@Override
+	public void run()
+	{
+		try
+		{
+			while (!Thread.interrupted())
+			{
+				connectionSelector.iterateOverConnections();
+			}
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+			System.exit(-41);
+		}
+		finally
+		{
+			connectionSelector.shutdown();
+		}
+	}
 
 }

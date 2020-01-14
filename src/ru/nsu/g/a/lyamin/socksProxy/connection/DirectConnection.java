@@ -10,62 +10,62 @@ import java.nio.channels.SocketChannel;
 
 public class DirectConnection extends Connection
 {
-    private SocketChannel channel;
-    private ConnectionBuffer bufferToReadFrom;
-    private ConnectionBuffer bufferToWriteTo;
+	private SocketChannel channel;
+	private ConnectionBuffer bufferToReadFrom;
+	private ConnectionBuffer bufferToWriteTo;
 
 
-    public DirectConnection(ConnectionSelector connectionSelector, SocketChannel _channel, ConnectionBuffer _bufferToRead, ConnectionBuffer _bufferToWrite)
-    {
-        super(connectionSelector);
-        channel = _channel;
-        bufferToReadFrom = _bufferToRead;
-        bufferToWriteTo = _bufferToWrite;
+	public DirectConnection(ConnectionSelector connectionSelector, SocketChannel _channel, ConnectionBuffer _bufferToRead, ConnectionBuffer _bufferToWrite)
+	{
+		super(connectionSelector);
+		channel = _channel;
+		bufferToReadFrom = _bufferToRead;
+		bufferToWriteTo = _bufferToWrite;
 
-        //System.out.println("DIRECT PHASE CTOR");
-    }
+		//System.out.println("DIRECT PHASE CTOR");
+	}
 
-    @Override
-    public void perform(SelectionKey key)
-    {
-        if(key.isValid() && key.isReadable())
-        {
-            try
-            {
-                if(!bufferToWriteTo.readFromChannelToBuffer(channel))
-                {
-                    terminate(key);
-                    return;
-                }
-            }
-            catch (IOException e)
-            {
-                //e.printStackTrace();
-            }
-        }
+	@Override
+	public void perform(SelectionKey key)
+	{
+		if (key.isValid() && key.isReadable())
+		{
+			try
+			{
+				if (!bufferToWriteTo.readFromChannelToBuffer(channel))
+				{
+					terminate(key);
+					return;
+				}
+			}
+			catch (IOException e)
+			{
+				//e.printStackTrace();
+			}
+		}
 
-        if(key.isValid() && key.isWritable())
-        {
-            try
-            {
-                bufferToReadFrom.writeToChannelFromBuffer(channel);
-            }
-            catch (AsynchronousCloseException eBoy)
-            {
-                try
-                {
-                    connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ);
-                }
-                catch (ClosedChannelException e)
-                {
-                    e.printStackTrace();
-                }
-            }
-            catch (IOException e)
-            {
-                //e.printStackTrace();
-            }
-        }
+		if (key.isValid() && key.isWritable())
+		{
+			try
+			{
+				bufferToReadFrom.writeToChannelFromBuffer(channel);
+			}
+			catch (AsynchronousCloseException eBoy)
+			{
+				try
+				{
+					connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ);
+				}
+				catch (ClosedChannelException e)
+				{
+					e.printStackTrace();
+				}
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
 
 
 //        if(key.isValid() && key.isConnectable())
@@ -81,19 +81,19 @@ public class DirectConnection extends Connection
 //                e.printStackTrace();
 //            }
 //        }
-    }
+	}
 
-    @Override
-    public void terminate()
-    {
-        connectionSelector.deleteConnection(channel);
-        try
-        {
-            channel.close();
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        }
-    }
+	@Override
+	public void terminate()
+	{
+		connectionSelector.deleteConnection(channel);
+		try
+		{
+			channel.close();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
 }

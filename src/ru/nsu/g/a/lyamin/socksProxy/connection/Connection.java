@@ -8,20 +8,20 @@ import java.nio.channels.spi.AbstractSelectableChannel;
 
 public abstract class Connection
 {
-    protected ConnectionSelector connectionSelector;
+	protected ConnectionSelector connectionSelector;
 
-    public Connection(ConnectionSelector _connectionSelector)
-    {
-        connectionSelector = _connectionSelector;
-    }
+	public Connection(ConnectionSelector _connectionSelector)
+	{
+		connectionSelector = _connectionSelector;
+	}
 
-    public abstract void perform(SelectionKey key) throws IOException;
+	public abstract void perform(SelectionKey key) throws IOException;
 
-    public void terminate(SelectionKey key)
-    {
-        key.cancel();
-        connectionSelector.deleteConnection((AbstractSelectableChannel) key.channel());
-    }
+	public void terminate(SelectionKey key)
+	{
+		key.cancel();
+		connectionSelector.deleteConnection((AbstractSelectableChannel) key.channel());
+	}
 
-    public abstract void terminate();
+	public abstract void terminate();
 }

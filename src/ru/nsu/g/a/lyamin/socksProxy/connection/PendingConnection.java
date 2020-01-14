@@ -11,77 +11,76 @@ import java.nio.channels.SocketChannel;
 public class PendingConnection extends Connection
 {
 
-    private SocketChannel channel;
-    private SecondPhaseConnection secondPhaseConnection;
+	private SocketChannel channel;
+	private SecondPhaseConnection secondPhaseConnection;
 
-    public PendingConnection(ConnectionSelector _connectionSelector, SocketChannel _channel, SecondPhaseConnection _secondPhaseConnection, SocketAddress address) throws IOException
-    {
-        super(_connectionSelector);
-        channel = _channel;
-        secondPhaseConnection = _secondPhaseConnection;
+	public PendingConnection(ConnectionSelector _connectionSelector, SocketChannel _channel, SecondPhaseConnection _secondPhaseConnection, SocketAddress address) throws IOException
+	{
+		super(_connectionSelector);
+		channel = _channel;
+		secondPhaseConnection = _secondPhaseConnection;
 
-        //System.out.println("PENDING CTOR");
+		//System.out.println("PENDING CTOR");
 
-        boolean connected;
+		boolean connected;
 
-        try
-        {
-            connected = channel.connect(address);
-        }
-        catch(java.nio.channels.AlreadyConnectedException ignored)
-        {
-            secondPhaseConnection.setIsConnected(true, this);
-            return;
-        }
+		try
+		{
+			connected = channel.connect(address);
+		}
+		catch (java.nio.channels.AlreadyConnectedException ignored)
+		{
+			secondPhaseConnection.setIsConnected(true, this);
+			return;
+		}
 
 
-        if(connected)
-        {
-            secondPhaseConnection.setIsConnected(true, this);
-        }
-        else
-        {
-            connectionSelector.registerConnection(channel, this, SelectionKey.OP_CONNECT);
-        }
+		if (connected)
+		{
+			secondPhaseConnection.setIsConnected(true, this);
+		} else
+		{
+			connectionSelector.registerConnection(channel, this, SelectionKey.OP_CONNECT);
+		}
 
-    }
+	}
 
-    @Override
-    public void perform(SelectionKey key) throws IOException
-    {
-        if(key.isValid() && key.isConnectable())
-        {
-            try
-            {
-                boolean result = channel.finishConnect();
-                secondPhaseConnection.setIsConnected(result, this);
-            }
-            catch(SocketException e)
-            {
-                secondPhaseConnection.setIsConnected(false, this);
-            }
+	@Override
+	public void perform(SelectionKey key) throws IOException
+	{
+		if (key.isValid() && key.isConnectable())
+		{
+			try
+			{
+				boolean result = channel.finishConnect();
+				secondPhaseConnection.setIsConnected(result, this);
+			}
+			catch (SocketException e)
+			{
+				secondPhaseConnection.setIsConnected(false, this);
+			}
 
-            key.cancel();
+			key.cancel();
 
-        }
-    }
+		}
+	}
 
-    @Override
-    public void terminate()
-    {
-        connectionSelector.deleteConnection(channel);
-        try
-        {
-            channel.close();
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-        }
-    }
+	@Override
+	public void terminate()
+	{
+		connectionSelector.deleteConnection(channel);
+		try
+		{
+			channel.close();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
 
-    public SocketChannel getChannel()
-    {
-        return channel;
-    }
+	public SocketChannel getChannel()
+	{
+		return channel;
+	}
 }

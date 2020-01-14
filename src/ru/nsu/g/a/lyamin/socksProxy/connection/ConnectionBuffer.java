@@ -6,56 +6,53 @@ import java.nio.channels.SocketChannel;
 
 public class ConnectionBuffer
 {
-    private final int capacity = 16384;
+	private final int capacity = 16384;
 
-    private byte[] buffer = new byte[capacity];
+	private byte[] buffer = new byte[capacity];
 
-    private int writeOffset = 0;
-    private int readOffset = 0;
+	private int writeOffset = 0;
+	private int readOffset = 0;
 
-    private boolean shutdown = false;
+	private boolean shutdown = false;
 
-    private ByteBuffer[] getByteBuffersArrayToRead()
-    {
-        if(writeOffset < readOffset)
-        {
-            ByteBuffer result[] = new ByteBuffer[1];
-            result[0] = ByteBuffer.wrap(buffer, writeOffset, readOffset - writeOffset);
-            return result;
-        }
-        else
-        {
-            if(readOffset == 0)
-            {
-                ByteBuffer result[] = new ByteBuffer[1];
-                result[0] = ByteBuffer.wrap(buffer, writeOffset, capacity - writeOffset);
-                return result;
-            }
-            else
-            {
-                ByteBuffer result[] = new ByteBuffer[2];
-                result[0] = ByteBuffer.wrap(buffer, writeOffset, capacity - writeOffset);
-                result[1] = ByteBuffer.wrap(buffer, 0, readOffset);
-                return result;
-            }
+	private ByteBuffer[] getByteBuffersArrayToRead()
+	{
+		if (writeOffset < readOffset)
+		{
+			ByteBuffer result[] = new ByteBuffer[1];
+			result[0] = ByteBuffer.wrap(buffer, writeOffset, readOffset - writeOffset);
+			return result;
+		} else
+		{
+			if (readOffset == 0)
+			{
+				ByteBuffer result[] = new ByteBuffer[1];
+				result[0] = ByteBuffer.wrap(buffer, writeOffset, capacity - writeOffset);
+				return result;
+			} else
+			{
+				ByteBuffer result[] = new ByteBuffer[2];
+				result[0] = ByteBuffer.wrap(buffer, writeOffset, capacity - writeOffset);
+				result[1] = ByteBuffer.wrap(buffer, 0, readOffset);
+				return result;
+			}
 
-        }
-    }
+		}
+	}
 
-    private ByteBuffer[] getByteBuffersArrayToWrite()
-    {
-        if(writeOffset < readOffset)
-        {
-            ByteBuffer result[] = new ByteBuffer[2];
-            result[0] = ByteBuffer.wrap(buffer, readOffset, capacity - readOffset);
-            result[1] = ByteBuffer.wrap(buffer, 0, writeOffset);
-            return result;
-        }
-        else
-        {
-            ByteBuffer result[] = new ByteBuffer[1];
-            result[0] = ByteBuffer.wrap(buffer, readOffset, writeOffset - readOffset);
-            return result;
+	private ByteBuffer[] getByteBuffersArrayToWrite()
+	{
+		if (writeOffset < readOffset)
+		{
+			ByteBuffer result[] = new ByteBuffer[2];
+			result[0] = ByteBuffer.wrap(buffer, readOffset, capacity - readOffset);
+			result[1] = ByteBuffer.wrap(buffer, 0, writeOffset);
+			return result;
+		} else
+		{
+			ByteBuffer result[] = new ByteBuffer[1];
+			result[0] = ByteBuffer.wrap(buffer, readOffset, writeOffset - readOffset);
+			return result;
 //            if(readOffset == 0)
 //            {
 //                ByteBuffer result[] = new ByteBuffer[1];
@@ -69,21 +66,21 @@ public class ConnectionBuffer
 //                result[1] = ByteBuffer.wrap(buffer, 0, readOffset);
 //                return result;
 //            }
-        }
-    }
+		}
+	}
 
-    public boolean readFromChannelToBuffer(SocketChannel channel) throws IOException
-    {
-        ByteBuffer buffers[] = getByteBuffersArrayToRead();
+	public boolean readFromChannelToBuffer(SocketChannel channel) throws IOException
+	{
+		ByteBuffer buffers[] = getByteBuffersArrayToRead();
 
-        long readen = channel.read(buffers);
+		long readen = channel.read(buffers);
 
-        if(readen == -1)
-        {
-            //System.out.println("EOF");
-            shutdown = true;
-            return false;
-        }
+		if (readen == -1)
+		{
+			//System.out.println("EOF");
+			shutdown = true;
+			return false;
+		}
 
 //        System.out.println("DIRECT read: " + readen);
 //        for(var v : buffers)
@@ -94,24 +91,24 @@ public class ConnectionBuffer
 //            }
 //        }
 
-        writeOffset = (writeOffset + (int)readen) % capacity;
+		writeOffset = (writeOffset + (int) readen) % capacity;
 
-        return true;
-    }
+		return true;
+	}
 
-    public void writeToChannelFromBuffer(SocketChannel channel) throws IOException
-    {
-        ByteBuffer buffers[] = getByteBuffersArrayToWrite();
+	public void writeToChannelFromBuffer(SocketChannel channel) throws IOException
+	{
+		ByteBuffer buffers[] = getByteBuffersArrayToWrite();
 
-        long written = channel.write(buffers);
+		long written = channel.write(buffers);
 
-        if(shutdown && (written == 0))
-        {
-            channel.shutdownOutput();
-            return;
-        }
+		if (shutdown && (written == 0))
+		{
+			channel.shutdownOutput();
+			return;
+		}
 
-        readOffset = (readOffset + (int)written) % capacity;
-    }
+		readOffset = (readOffset + (int) written) % capacity;
+	}
 
 }
