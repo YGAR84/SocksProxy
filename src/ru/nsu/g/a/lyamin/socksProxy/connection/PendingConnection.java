@@ -61,7 +61,6 @@ public class PendingConnection extends Connection
 			}
 
 			key.cancel();
-
 		}
 	}
 

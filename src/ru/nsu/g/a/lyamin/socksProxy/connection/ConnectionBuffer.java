@@ -2,6 +2,7 @@ package ru.nsu.g.a.lyamin.socksProxy.connection;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 public class ConnectionBuffer
@@ -10,10 +11,24 @@ public class ConnectionBuffer
 
 	private byte[] buffer = new byte[capacity];
 
+	private DirectConnection reader;
+	private DirectConnection writer;
+
 	private int writeOffset = 0;
 	private int readOffset = 0;
+	private int filled = 0;
 
 	private boolean shutdown = false;
+
+	public void setReader(DirectConnection _reader)
+	{
+		reader = _reader;
+	}
+
+	public void setWriter(DirectConnection _writer)
+	{
+		writer = _writer;
+	}
 
 	private ByteBuffer[] getByteBuffersArrayToRead()
 	{
@@ -69,18 +84,51 @@ public class ConnectionBuffer
 		}
 	}
 
+	private void enableOption(DirectConnection directConnection, int opt)
+	{
+		if(directConnection == null) return;
+
+		directConnection.connectionSelector.registerConnection(reader.getChannel(), reader,
+				reader.getChannel().validOps() | opt);
+	}
+
+	private void disableOption(DirectConnection directConnection, int opt)
+	{
+		if(directConnection == null) return;
+
+		directConnection.connectionSelector.registerConnection(reader.getChannel(), reader,
+				reader.getChannel().validOps() & ~opt);
+	}
+
+
 	public boolean readFromChannelToBuffer(SocketChannel channel) throws IOException
 	{
 		ByteBuffer buffers[] = getByteBuffersArrayToRead();
 
-		long readen = channel.read(buffers);
+		long read = channel.read(buffers);
 
-		if (readen == -1)
+		filled += read;
+
+		if (read == -1)
 		{
 			//System.out.println("EOF");
 			shutdown = true;
 			return false;
 		}
+
+		if(read == 0)
+		{
+			return true;
+		}
+
+		if(filled == capacity)
+		{
+			disableOption(writer, SelectionKey.OP_READ);
+//			writer.connectionSelector.registerConnection(writer.getChannel(), writer, writer.getChannel().validOps() & ~SelectionKey.OP_READ);
+		}
+
+		enableOption(reader, SelectionKey.OP_WRITE);
+//		reader.connectionSelector.registerConnection(reader.getChannel(), reader, reader.getChannel().validOps() | SelectionKey.OP_WRITE);
 
 //        System.out.println("DIRECT read: " + readen);
 //        for(var v : buffers)
@@ -91,7 +139,7 @@ public class ConnectionBuffer
 //            }
 //        }
 
-		writeOffset = (writeOffset + (int) readen) % capacity;
+		writeOffset = (writeOffset + (int) read) % capacity;
 
 		return true;
 	}
@@ -102,11 +150,27 @@ public class ConnectionBuffer
 
 		long written = channel.write(buffers);
 
+		filled -= written;
+
 		if (shutdown && (written == 0))
 		{
 			channel.shutdownOutput();
 			return;
 		}
+
+
+		if(filled == 0)
+		{
+			disableOption(reader, SelectionKey.OP_WRITE);
+//			reader.connectionSelector.registerConnection(reader.getChannel(), reader, reader.getChannel().validOps() & ~SelectionKey.OP_WRITE);
+		}
+
+		if(written > 0)
+		{
+			enableOption(reader, SelectionKey.OP_READ);
+			writer.connectionSelector.registerConnection(writer.getChannel(), writer, writer.getChannel().validOps() | SelectionKey.OP_READ);
+		}
+
 
 		readOffset = (readOffset + (int) written) % capacity;
 	}

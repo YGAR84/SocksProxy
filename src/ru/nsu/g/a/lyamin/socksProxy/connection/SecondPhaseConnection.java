@@ -141,6 +141,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
 //            connectionSelector.registerConnection(channel, this, 0);
 			key.cancel();
+			return;
 		}
 
 		if (key.isValid() && key.isWritable())
@@ -168,13 +169,14 @@ public class SecondPhaseConnection extends PhaseConnection
 
 			DirectConnection directConnection1 = new DirectConnection(connectionSelector, channel, firstBuffer,
 					secondBuffer);
+
 			DirectConnection directConnection2 = new DirectConnection(connectionSelector,
 					pendingConnection.getChannel(), secondBuffer, firstBuffer);
 
 			connectionSelector.registerConnection(channel, directConnection1,
-					SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+					SelectionKey.OP_READ);
 			connectionSelector.registerConnection(pendingConnection.getChannel(), directConnection2,
-					SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+					SelectionKey.OP_WRITE);
 
 //
 //            SocketChannel channel2 = SocketChannel.open();

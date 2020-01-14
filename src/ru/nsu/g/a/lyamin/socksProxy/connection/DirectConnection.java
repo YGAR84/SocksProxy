@@ -22,6 +22,9 @@ public class DirectConnection extends Connection
 		bufferToReadFrom = _bufferToRead;
 		bufferToWriteTo = _bufferToWrite;
 
+		bufferToReadFrom.setReader(this);
+		bufferToWriteTo.setWriter(this);
+
 		//System.out.println("DIRECT PHASE CTOR");
 	}
 
@@ -40,7 +43,10 @@ public class DirectConnection extends Connection
 			}
 			catch (IOException e)
 			{
-				//e.printStackTrace();
+				e.printStackTrace();
+				terminate(key);
+				return;
+
 			}
 		}
 
@@ -52,18 +58,13 @@ public class DirectConnection extends Connection
 			}
 			catch (AsynchronousCloseException eBoy)
 			{
-				try
-				{
-					connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ);
-				}
-				catch (ClosedChannelException e)
-				{
-					e.printStackTrace();
-				}
+				eBoy.printStackTrace();
+				connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ);
 			}
 			catch (IOException e)
 			{
 				e.printStackTrace();
+				terminate(key);
 			}
 		}
 
@@ -81,6 +82,11 @@ public class DirectConnection extends Connection
 //                e.printStackTrace();
 //            }
 //        }
+	}
+
+	public SocketChannel getChannel()
+	{
+		return channel;
 	}
 
 	@Override

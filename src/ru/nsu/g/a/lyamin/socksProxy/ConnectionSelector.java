@@ -32,7 +32,7 @@ public class ConnectionSelector
 		connectionMap.remove(channel);
 	}
 
-	public void registerConnection(AbstractSelectableChannel channel, Connection connection, int opts) throws ClosedChannelException
+	public void registerConnection(AbstractSelectableChannel channel, Connection connection, int opts)
 	{
 //        System.out.println("is registered:" + channel.isRegistered() + " " + channel.isOpen());
 //        if(!channel.isRegistered())
@@ -45,6 +45,7 @@ public class ConnectionSelector
 		{
 			e.printStackTrace();
 			connection.terminate();
+			return;
 		}
 
 		connectionMap.put(channel, connection);

@@ -24,6 +24,7 @@ public class DNSConnection extends Connection
 	private Map<Integer, SecondPhaseConnection> needAck = new HashMap<>();
 
 	private Map<byte[], InetAddress> cachedHosts = new HashMap<>();
+	private Map<byte[], Long> delays = new HashMap<>();
 
 	private Map<Integer, Message> messageSendMap = new HashMap<>();
 	private Map<Integer, Message> messageWaitMap = new HashMap<>();
