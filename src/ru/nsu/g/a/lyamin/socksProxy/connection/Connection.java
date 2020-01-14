@@ -22,4 +22,6 @@ public abstract class Connection
         key.cancel();
         connectionSelector.deleteConnection((AbstractSelectableChannel) key.channel());
     }
+
+    public abstract void terminate();
 }

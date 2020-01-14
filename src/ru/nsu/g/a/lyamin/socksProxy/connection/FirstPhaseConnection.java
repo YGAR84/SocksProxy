@@ -21,7 +21,7 @@ public class FirstPhaseConnection extends PhaseConnection
     public FirstPhaseConnection(ConnectionSelector connectionSelector, SocketChannel channel)
     {
         super(connectionSelector, channel);
-        System.out.println("FIRST PHASE CTOR");
+        //System.out.println("FIRST PHASE CTOR");
     }
 
     @Override
@@ -40,7 +40,7 @@ public class FirstPhaseConnection extends PhaseConnection
 
             byte[] firstPhaseRequest = new byte[buffer.position()];
             System.arraycopy(buffer.array(), 0, firstPhaseRequest, 0, firstPhaseRequest.length);
-            System.out.println("FIRST PHASE REQUEST: " + Arrays.toString(firstPhaseRequest));
+            //System.out.println("FIRST PHASE REQUEST: " + Arrays.toString(firstPhaseRequest));
 
             if(buffer.get(0) != 0x05)
             {
@@ -66,7 +66,7 @@ public class FirstPhaseConnection extends PhaseConnection
         {
             int written = channel.write(ByteBuffer.wrap(answer));
 
-            System.out.println("FIRST PHASE write: " + written);
+            //System.out.println("FIRST PHASE write: " + written);
             answerWrittenAll += written;
 
             if(answerWrittenAll != answer.length)
@@ -74,7 +74,7 @@ public class FirstPhaseConnection extends PhaseConnection
                 return;
             }
 
-            System.out.println("FIRST PHASE ANSWER: " + Arrays.toString(answer));
+            //System.out.println("FIRST PHASE ANSWER: " + Arrays.toString(answer));
 
             SecondPhaseConnection secondPhaseConnection = new SecondPhaseConnection(connectionSelector, channel);
             connectionSelector.registerConnection(channel, secondPhaseConnection, SelectionKey.OP_READ);
@@ -102,6 +102,20 @@ public class FirstPhaseConnection extends PhaseConnection
     public void terminate(SelectionKey key)
     {
         super.terminate(key);
+        try
+        {
+            channel.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void terminate()
+    {
+        connectionSelector.deleteConnection(channel);
         try
         {
             channel.close();

@@ -37,7 +37,7 @@ public class SecondPhaseConnection extends PhaseConnection
     public SecondPhaseConnection(ConnectionSelector connectionSelector, SocketChannel channel)
     {
         super(connectionSelector, channel);
-        System.out.println("SECOND PHASE CTOR");
+        //System.out.println("SECOND PHASE CTOR");
     }
 
     @Override
@@ -66,7 +66,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
             byte[] secondPhaseRequest = new byte[buffer.position()];
             System.arraycopy(buffer.array(), 0, secondPhaseRequest, 0, secondPhaseRequest.length);
-            System.out.println("SECOND PHASE REQUEST: " + Arrays.toString(secondPhaseRequest));
+            //System.out.println("SECOND PHASE REQUEST: " + Arrays.toString(secondPhaseRequest));
 
             if(buffer.get(0) != 0x05)
             {
@@ -150,7 +150,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
         if(key.isValid() && key.isWritable())
         {
-            System.out.println("SECOND PHASE IS WRITABLE");
+            //System.out.println("SECOND PHASE IS WRITABLE");
             int written = channel.write(ByteBuffer.wrap(answer));
 
             answerWrittenAll += written;
@@ -160,7 +160,7 @@ public class SecondPhaseConnection extends PhaseConnection
                 return;
             }
 
-            System.out.println("SECOND PHASE ANSWER: " + Arrays.toString(answer));
+            //System.out.println("SECOND PHASE ANSWER: " + Arrays.toString(answer));
 
             if(hasError())
             {
@@ -240,26 +240,39 @@ public class SecondPhaseConnection extends PhaseConnection
         }
     }
 
-    public void setIpResolved(boolean ipResolved, InetAddress resolvedIp) throws IOException
+    public void setIpResolved(boolean ipResolved, InetAddress resolvedIp)
     {
-
         if(isResolved) return;
 
-        if(!ipResolved)
+        try
         {
-            error = 0x04;
-            createAnswer();
-            return;
+            if(!ipResolved)
+            {
+                error = 0x04;
+                createAnswer();
+                return;
+            }
+
+            isResolved = true;
+
+            SocketChannel socketChannel = SocketChannel.open();
+            socketChannel.configureBlocking(false);
+
+            createPending(socketChannel, new InetSocketAddress(resolvedIp, port));
+        }
+        catch(IOException e)
+        {
+            terminate();
         }
 
-        isResolved = true;
 
-        System.out.println("RESOLVED: " + resolvedIp.toString());
 
-        SocketChannel socketChannel = SocketChannel.open();
-        socketChannel.configureBlocking(false);
 
-        createPending(socketChannel, new InetSocketAddress(resolvedIp, port));
+
+
+        //System.out.println("RESOLVED: " + resolvedIp.toString());
+
+
 //        PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(resolvedIp, port));
     }
 
@@ -270,7 +283,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
     private void createAnswer() throws ClosedChannelException
     {
-        System.out.println("SECOND PHASE CREATE ANSWER");
+        //System.out.println("SECOND PHASE CREATE ANSWER");
         connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
 
         InetSocketAddress remoteAddress = null;
@@ -344,7 +357,7 @@ public class SecondPhaseConnection extends PhaseConnection
         byte[] newPortBytes = new byte[4];
         System.arraycopy(portBytes, 0, newPortBytes, 2, portBytes.length);
 
-        System.out.println(Arrays.toString(newPortBytes));
+        //System.out.println(Arrays.toString(newPortBytes));
         return ByteBuffer.wrap(newPortBytes).order(ByteOrder.BIG_ENDIAN).getInt();
     }
 
@@ -362,6 +375,20 @@ public class SecondPhaseConnection extends PhaseConnection
     public void terminate(SelectionKey key)
     {
         super.terminate(key);
+        try
+        {
+            channel.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void terminate()
+    {
+        connectionSelector.deleteConnection(channel);
         try
         {
             channel.close();

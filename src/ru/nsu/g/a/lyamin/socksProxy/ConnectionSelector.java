@@ -37,8 +37,15 @@ public class ConnectionSelector
 //        System.out.println("is registered:" + channel.isRegistered() + " " + channel.isOpen());
 //        if(!channel.isRegistered())
 //        {
+        try
+        {
             channel.register(selector, opts);
-//        }
+        }
+        catch(IOException e)
+        {
+            e.printStackTrace();
+            connection.terminate();
+        }
 
         connectionMap.put(channel, connection);
     }

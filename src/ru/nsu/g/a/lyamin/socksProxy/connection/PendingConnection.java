@@ -20,7 +20,7 @@ public class PendingConnection extends Connection
         channel = _channel;
         secondPhaseConnection = _secondPhaseConnection;
 
-        System.out.println("PENDING CTOR");
+        //System.out.println("PENDING CTOR");
 
         boolean connected;
 
@@ -63,6 +63,20 @@ public class PendingConnection extends Connection
 
             key.cancel();
 
+        }
+    }
+
+    @Override
+    public void terminate()
+    {
+        connectionSelector.deleteConnection(channel);
+        try
+        {
+            channel.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
         }
     }
 

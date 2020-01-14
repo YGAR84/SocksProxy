@@ -80,7 +80,7 @@ public class ConnectionBuffer
 
         if(readen == -1)
         {
-            System.out.println("EOF");
+            //System.out.println("EOF");
             shutdown = true;
             return false;
         }

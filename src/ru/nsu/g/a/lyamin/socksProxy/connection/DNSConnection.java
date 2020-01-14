@@ -11,7 +11,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,8 +23,11 @@ public class DNSConnection extends Connection
 
     private Map<Integer, SecondPhaseConnection> needAck = new HashMap<>();
 
+    private Map<byte[], InetAddress> cachedHosts = new HashMap<>();
+
     private Map<Integer, Message> messageSendMap = new HashMap<>();
     private Map<Integer, Message> messageWaitMap = new HashMap<>();
+    private Map<Integer, byte[]> addressesIds = new HashMap<>();
 
     private SocketAddress dnsRequestAddress;
 
@@ -65,7 +67,7 @@ public class DNSConnection extends Connection
 
             channel.connect(dnsRequestAddress);
 
-            System.out.println("Finish initialization");
+            //System.out.println("Finish initialization");
         }
         catch (IOException e)
         {
@@ -81,13 +83,18 @@ public class DNSConnection extends Connection
         if(messageSendMap.size() > 0) opts |= SelectionKey.OP_WRITE;
         if(messageWaitMap.size() > 0) opts |= SelectionKey.OP_READ;
 
-        System.out.println("DNS OPTS CHANGES: " + opts);
+        //System.out.println("DNS OPTS CHANGES: " + opts);
 
         connectionSelector.registerConnection(channel, this, opts);
     }
 
     public void resolveAddress(byte[] address, SecondPhaseConnection connection) throws org.xbill.DNS.TextParseException, ClosedChannelException
     {
+        if(cachedHosts.containsKey(address))
+        {
+            connection.setIpResolved(true, cachedHosts.get(address));
+            return;
+        }
         needAck.put(counter, connection);
 
         Message message = new Message();
@@ -100,7 +107,7 @@ public class DNSConnection extends Connection
 
         String hostAddress = new String(address);
         String newHostAddress = hostAddress + ".";
-        System.out.println("HOST ADDRESS: " + newHostAddress);
+        //System.out.println("HOST ADDRESS: " + newHostAddress);
         Name name = new Name(newHostAddress);
         Record record = null;
         try
@@ -109,21 +116,15 @@ public class DNSConnection extends Connection
         }
         catch(RelativeNameException e)
         {
-            System.out.println(e.getMessage());
+            //System.out.println(e.getMessage());
             needAck.remove(counter);
-            try
-            {
-                connection.setIpResolved(false, null);
-            }
-            catch (IOException ignored2)
-            {
-                System.out.println("ioexception in setIpResolved");
-            }
+            connection.setIpResolved(false, null);
             return;
         }
 
         message.addRecord(record, Section.QUESTION);
         messageSendMap.put(counter, message);
+        addressesIds.put(counter, address);
         ++counter;
 
         reregister();
@@ -135,7 +136,7 @@ public class DNSConnection extends Connection
 
         if(key.isValid() && key.isWritable())
         {
-            System.out.println(messageSendMap.size());
+            //System.out.println(messageSendMap.size());
             Map.Entry<Integer, Message> record = messageSendMap.entrySet().iterator().next();
             int sended = channel.send(ByteBuffer.wrap(record.getValue().toWire()), dnsRequestAddress);
 
@@ -160,7 +161,8 @@ public class DNSConnection extends Connection
             if(!needAck.containsKey(id)) return;
 
             SecondPhaseConnection connection = needAck.get(id);
-            System.out.println("DNS READ FOR CONNECTION: " + (connection == null));
+
+            //System.out.println("DNS READ FOR CONNECTION: " + (connection == null));
             needAck.remove(id);
             messageSendMap.remove(id);
 
@@ -184,7 +186,19 @@ public class DNSConnection extends Connection
                 }
             }
 
-            connection.setIpResolved( resolverIp != null, resolverIp);
+            if(resolverIp != null)
+            {
+
+                cachedHosts.put(addressesIds.remove(id), resolverIp);
+
+                connection.setIpResolved( true, resolverIp);
+            }
+            else
+            {
+                connection.setIpResolved( false, null);
+            }
+
+
         }
 
         reregister();
@@ -196,5 +210,19 @@ public class DNSConnection extends Connection
     {
         super.terminate(key);
         connectionSelector.shutdown();
+    }
+
+    @Override
+    public void terminate()
+    {
+        connectionSelector.deleteConnection(channel);
+        try
+        {
+            channel.close();
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
     }
 }
