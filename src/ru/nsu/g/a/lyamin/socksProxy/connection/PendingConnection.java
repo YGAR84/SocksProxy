@@ -4,6 +4,7 @@ import ru.nsu.g.a.lyamin.socksProxy.ConnectionSelector;
 
 import java.io.IOException;
 import java.net.SocketAddress;
+import java.net.SocketException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
@@ -50,9 +51,18 @@ public class PendingConnection extends Connection
     {
         if(key.isValid() && key.isConnectable())
         {
-            boolean result = channel.finishConnect();
+            try
+            {
+                boolean result = channel.finishConnect();
+                secondPhaseConnection.setIsConnected(result, this);
+            }
+            catch(SocketException e)
+            {
+                secondPhaseConnection.setIsConnected(false, this);
+            }
 
-            secondPhaseConnection.setIsConnected(result, this);
+            key.cancel();
+
         }
     }
 

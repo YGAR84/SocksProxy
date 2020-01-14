@@ -7,7 +7,6 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.AbstractSelectableChannel;
-import java.sql.SQLOutput;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -48,9 +47,18 @@ public class ConnectionSelector
     {
         selector.select();
 
+
+        //System.out.println("KEY SIZE: " + selector.keys().size());
+        //System.out.println("CONNECTION MAP SIZE: " + connectionMap.size());
+//        for(var v : selector.keys())
+//        {
+//            System.out.println("v: " + v.isValid() +"; a: " + v.isAcceptable() + "; r: " + v.isReadable() +
+//                    "; w: " + v.isWritable() + "; c: " + v.isConnectable());
+//        }
+
         Set<SelectionKey> selectedKeys = selector.selectedKeys();
 
-        int size = selectedKeys.size();
+//        int size = selectedKeys.size();
 //        if(size >= 2)
 //            System.out.println("size: " + size);
 

@@ -67,18 +67,18 @@ public class DirectConnection extends Connection
             }
         }
 
-        if(key.isValid() && key.isConnectable())
-        {
-            try
-            {
-                channel.finishConnect();
-
-                connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-            }
-            catch (IOException e)
-            {
-                e.printStackTrace();
-            }
-        }
+//        if(key.isValid() && key.isConnectable())
+//        {
+//            try
+//            {
+//                channel.finishConnect();
+//
+//                connectionSelector.registerConnection(channel, this, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+//            }
+//            catch (IOException e)
+//            {
+//                e.printStackTrace();
+//            }
+//        }
     }
 }

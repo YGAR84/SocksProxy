@@ -22,7 +22,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
     private byte[] addressBytes;
 
-    private boolean isIp;
+    private boolean isResolved = false;
 
     private int port;
 
@@ -45,8 +45,18 @@ public class SecondPhaseConnection extends PhaseConnection
     {
         if(key.isValid() && key.isReadable())
         {
-            int read = channel.read(buffer);
-            if(read != -1)
+            int read;
+            try
+            {
+                read = channel.read(buffer);
+            }
+            catch(IOException ignored)
+            {
+                terminate(key);
+                return;
+            }
+
+            if(read == -1)
             {
                 terminate(key);
                 return;
@@ -81,6 +91,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
             byte addressType = buffer.get(3);
 
+            boolean isIp;
             if(addressType == 0x01)
             {
                 isIp = true;
@@ -133,12 +144,13 @@ public class SecondPhaseConnection extends PhaseConnection
                 dnsConnection.resolveAddress(addressBytes, this);
             }
 
+//            connectionSelector.registerConnection(channel, this, 0);
             key.cancel();
         }
 
         if(key.isValid() && key.isWritable())
         {
-
+            System.out.println("SECOND PHASE IS WRITABLE");
             int written = channel.write(ByteBuffer.wrap(answer));
 
             answerWrittenAll += written;
@@ -150,7 +162,11 @@ public class SecondPhaseConnection extends PhaseConnection
 
             System.out.println("SECOND PHASE ANSWER: " + Arrays.toString(answer));
 
-            if(hasError()) { terminate(key); }
+            if(hasError())
+            {
+                terminate(key);
+                return;
+            }
 
             ConnectionBuffer firstBuffer = new ConnectionBuffer();
             ConnectionBuffer secondBuffer = new ConnectionBuffer();
@@ -227,6 +243,8 @@ public class SecondPhaseConnection extends PhaseConnection
     public void setIpResolved(boolean ipResolved, InetAddress resolvedIp) throws IOException
     {
 
+        if(isResolved) return;
+
         if(!ipResolved)
         {
             error = 0x04;
@@ -234,7 +252,12 @@ public class SecondPhaseConnection extends PhaseConnection
             return;
         }
 
+        isResolved = true;
+
+        System.out.println("RESOLVED: " + resolvedIp.toString());
+
         SocketChannel socketChannel = SocketChannel.open();
+        socketChannel.configureBlocking(false);
 
         createPending(socketChannel, new InetSocketAddress(resolvedIp, port));
 //        PendingConnection pendingConnection = new PendingConnection(connectionSelector, socketChannel, this, new InetSocketAddress(resolvedIp, port));
@@ -247,7 +270,7 @@ public class SecondPhaseConnection extends PhaseConnection
 
     private void createAnswer() throws ClosedChannelException
     {
-
+        System.out.println("SECOND PHASE CREATE ANSWER");
         connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
 
         InetSocketAddress remoteAddress = null;

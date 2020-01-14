@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +20,7 @@ public class DNSConnection extends Connection
 {
     private DatagramChannel channel;
 
-    private ByteBuffer buffer = ByteBuffer.allocate(1024);
+    private ByteBuffer buffer = ByteBuffer.allocate(4096);
 
     private Map<Integer, SecondPhaseConnection> needAck = new HashMap<>();
 
@@ -60,21 +61,10 @@ public class DNSConnection extends Connection
 
             ResolverConfig resolverConfig = new ResolverConfig();
 
-//            System.out.println("Size: " + resolverConfig.servers().size());
-//            for(InetSocketAddress addr : resolverConfig.servers())
-//            {
-//                System.out.println(addr.getAddress().getHostName() + ":" + addr.getPort());
-//            }
-//            ResolverConfig resolverConfig = new ResolverConfig();
-
-
             dnsRequestAddress = resolverConfig.servers().get(0);
 
             channel.connect(dnsRequestAddress);
 
-//            connectionSelector.registerConnection(channel, this, SelectionKey.OP_CONNECT);
-//            System.out.println(.getHostName());
-//            channel.bind(resolverConfig.servers().get(0));
             System.out.println("Finish initialization");
         }
         catch (IOException e)
@@ -91,22 +81,14 @@ public class DNSConnection extends Connection
         if(messageSendMap.size() > 0) opts |= SelectionKey.OP_WRITE;
         if(messageWaitMap.size() > 0) opts |= SelectionKey.OP_READ;
 
+        System.out.println("DNS OPTS CHANGES: " + opts);
+
         connectionSelector.registerConnection(channel, this, opts);
     }
 
     public void resolveAddress(byte[] address, SecondPhaseConnection connection) throws org.xbill.DNS.TextParseException, ClosedChannelException
     {
         needAck.put(counter, connection);
-//        int id = 1;
-//        while(true)
-//        {
-//            if(!needAck.containsKey(id))
-//            {
-//                needAck.put(id, connection);
-//                break;
-//            }
-//            ++id;
-//        }
 
         Message message = new Message();
         Header header = message.getHeader();
@@ -115,8 +97,32 @@ public class DNSConnection extends Connection
         header.setRcode(Rcode.NOERROR);
         header.setFlag(Flags.RD);
 
-        Name name = new Name(new String(address));
-        message.addRecord(Record.newRecord(name, Type.A, DClass.IN), Section.QUESTION);
+
+        String hostAddress = new String(address);
+        String newHostAddress = hostAddress + ".";
+        System.out.println("HOST ADDRESS: " + newHostAddress);
+        Name name = new Name(newHostAddress);
+        Record record = null;
+        try
+        {
+            record = Record.newRecord(name, Type.A, DClass.IN);
+        }
+        catch(RelativeNameException e)
+        {
+            System.out.println(e.getMessage());
+            needAck.remove(counter);
+            try
+            {
+                connection.setIpResolved(false, null);
+            }
+            catch (IOException ignored2)
+            {
+                System.out.println("ioexception in setIpResolved");
+            }
+            return;
+        }
+
+        message.addRecord(record, Section.QUESTION);
         messageSendMap.put(counter, message);
         ++counter;
 
@@ -129,6 +135,7 @@ public class DNSConnection extends Connection
 
         if(key.isValid() && key.isWritable())
         {
+            System.out.println(messageSendMap.size());
             Map.Entry<Integer, Message> record = messageSendMap.entrySet().iterator().next();
             int sended = channel.send(ByteBuffer.wrap(record.getValue().toWire()), dnsRequestAddress);
 
@@ -146,10 +153,14 @@ public class DNSConnection extends Connection
             byte[] resp = new byte[buffer.position()];
 
             System.arraycopy(buffer.array(), 0, resp, 0, resp.length);
+            buffer.clear();
             Message response = new Message(resp);
 
             int id = response.getHeader().getID();
+            if(!needAck.containsKey(id)) return;
+
             SecondPhaseConnection connection = needAck.get(id);
+            System.out.println("DNS READ FOR CONNECTION: " + (connection == null));
             needAck.remove(id);
             messageSendMap.remove(id);
 
@@ -163,7 +174,7 @@ public class DNSConnection extends Connection
                 {
                     try
                     {
-                        resolverIp = InetAddress.getByName(record.getName().toString());
+                        resolverIp = InetAddress.getByAddress(record.rdataToWireCanonical());
                     }
                     catch(UnknownHostException ignored)
                     {
@@ -175,6 +186,8 @@ public class DNSConnection extends Connection
 
             connection.setIpResolved( resolverIp != null, resolverIp);
         }
+
+        reregister();
 
     }
 

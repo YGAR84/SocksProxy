@@ -19,6 +19,11 @@ public class ServerConnection extends Connection
         serverSocketChannel.configureBlocking(false);
         serverSocketChannel.bind(new InetSocketAddress(port));
 
+        System.out.println("WRITABLE: " + SelectionKey.OP_WRITE);
+        System.out.println("READABLE: " + SelectionKey.OP_READ);
+        System.out.println("ACCEPTABLE: " + SelectionKey.OP_ACCEPT);
+        System.out.println("CONNECTIBLE: " + SelectionKey.OP_CONNECT);
+
         connectionSelector.registerConnection(serverSocketChannel, this, SelectionKey.OP_ACCEPT);
     }
 

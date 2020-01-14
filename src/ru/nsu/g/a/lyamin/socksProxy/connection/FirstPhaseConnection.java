@@ -64,9 +64,9 @@ public class FirstPhaseConnection extends PhaseConnection
 
         if(key.isValid() && key.isWritable())
         {
-
             int written = channel.write(ByteBuffer.wrap(answer));
 
+            System.out.println("FIRST PHASE write: " + written);
             answerWrittenAll += written;
 
             if(answerWrittenAll != answer.length)
