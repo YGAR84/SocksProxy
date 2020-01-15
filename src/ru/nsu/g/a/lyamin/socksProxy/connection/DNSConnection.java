@@ -77,7 +77,7 @@ public class DNSConnection extends Connection
 
 	}
 
-	private void reregister() throws ClosedChannelException
+	private void reregister()
 	{
 		int opts = 0;
 
@@ -91,8 +91,10 @@ public class DNSConnection extends Connection
 
 	public void resolveAddress(byte[] address, SecondPhaseConnection connection) throws org.xbill.DNS.TextParseException, ClosedChannelException
 	{
+		System.out.println("RESOLVE ADDRESS");
 		if (cachedHosts.containsKey(address))
 		{
+			System.out.println("Cached has address: " + cachedHosts.get(address));
 			connection.setIpResolved(true, cachedHosts.get(address));
 			return;
 		}
@@ -105,12 +107,11 @@ public class DNSConnection extends Connection
 		header.setRcode(Rcode.NOERROR);
 		header.setFlag(Flags.RD);
 
-
 		String hostAddress = new String(address);
 		String newHostAddress = hostAddress + ".";
 		//System.out.println("HOST ADDRESS: " + newHostAddress);
 		Name name = new Name(newHostAddress);
-		Record record = null;
+		Record record;
 		try
 		{
 			record = Record.newRecord(name, Type.A, DClass.IN);
@@ -119,6 +120,7 @@ public class DNSConnection extends Connection
 		{
 			//System.out.println(e.getMessage());
 			needAck.remove(counter);
+			System.out.println("Cannot create record");
 			connection.setIpResolved(false, null);
 			return;
 		}
@@ -137,21 +139,29 @@ public class DNSConnection extends Connection
 
 		if (key.isValid() && key.isWritable())
 		{
-			//System.out.println(messageSendMap.size());
+			System.out.println("WRITABLE DNS");
+//			System.out.println(messageSendMap.size());
 			Map.Entry<Integer, Message> record = messageSendMap.entrySet().iterator().next();
-			int sended = channel.send(ByteBuffer.wrap(record.getValue().toWire()), dnsRequestAddress);
+			int send = channel.send(ByteBuffer.wrap(record.getValue().toWire()), dnsRequestAddress);
 
-			if (sended > 0)
+			if (send > 0)
 			{
+				System.out.println("SOMETHING HAPPENED");
 				messageWaitMap.put(record.getKey(), record.getValue());
 				messageSendMap.remove(record.getKey());
+				reregister();
 			}
 		}
 
 		if (key.isValid() && key.isReadable())
 		{
-			int readen = channel.read(buffer);
+			System.out.println("READABLE DNS");
+			int read = channel.read(buffer);
 
+			if(read == -1 || read == 0)
+			{
+				return;
+			}
 			byte[] resp = new byte[buffer.position()];
 
 			System.arraycopy(buffer.array(), 0, resp, 0, resp.length);
@@ -192,13 +202,13 @@ public class DNSConnection extends Connection
 
 				cachedHosts.put(addressesIds.remove(id), resolverIp);
 
+				System.out.println("IP RESOLVED: " + resolverIp);
 				connection.setIpResolved(true, resolverIp);
 			} else
 			{
+				System.out.println("IP NOT RESOLVED");
 				connection.setIpResolved(false, null);
 			}
-
-
 		}
 
 		reregister();

@@ -7,8 +7,6 @@ public class Main
 		Thread proxyServer = new Thread(new Server(60088));
 
 		proxyServer.setName("PROXY JIJA");
-
 		proxyServer.start();
-
 	}
 }

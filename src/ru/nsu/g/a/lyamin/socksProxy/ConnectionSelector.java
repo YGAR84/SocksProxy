@@ -1,6 +1,6 @@
 package ru.nsu.g.a.lyamin.socksProxy;
 
-import ru.nsu.g.a.lyamin.socksProxy.connection.Connection;
+import ru.nsu.g.a.lyamin.socksProxy.connection.*;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
@@ -32,6 +32,36 @@ public class ConnectionSelector
 		connectionMap.remove(channel);
 	}
 
+	public void enableOpt(AbstractSelectableChannel channel, int opt)
+	{
+		if(channel != null)
+		{
+			try
+			{
+				channel.register(selector, channel.validOps() | opt);
+			}
+			catch (ClosedChannelException e)
+			{
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public void disableOpt(AbstractSelectableChannel channel, int opt)
+	{
+		if(channel != null)
+		{
+			try
+			{
+				channel.register(selector, channel.validOps() & ~opt);
+			}
+			catch (ClosedChannelException e)
+			{
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public void registerConnection(AbstractSelectableChannel channel, Connection connection, int opts)
 	{
 //        System.out.println("is registered:" + channel.isRegistered() + " " + channel.isOpen());
@@ -55,12 +85,12 @@ public class ConnectionSelector
 	{
 		selector.select();
 
-
-		//System.out.println("KEY SIZE: " + selector.keys().size());
-		//System.out.println("CONNECTION MAP SIZE: " + connectionMap.size());
+//		System.out.println("KEY SIZE: " + selector.keys().size());
+//		System.out.println("CONNECTION MAP SIZE: " + connectionMap.size());
 //        for(var v : selector.keys())
 //        {
-//            System.out.println("v: " + v.isValid() +"; a: " + v.isAcceptable() + "; r: " + v.isReadable() +
+//        	Connection connection = connectionMap.get(v.channel());
+//            System.out.println(connectionToString(connection) + "; v: " + v.isValid() +"; a: " + v.isAcceptable() + "; r: " + v.isReadable() +
 //                    "; w: " + v.isWritable() + "; c: " + v.isConnectable());
 //        }
 
@@ -89,6 +119,42 @@ public class ConnectionSelector
 		}
 
 		//System.out.println("iter is over");
+	}
+
+	private String connectionToString(Connection connection)
+	{
+		if(connection instanceof DNSConnection)
+		{
+			return "DNS CONNECTION";
+		}
+		else if(connection instanceof FirstPhaseConnection)
+		{
+			return "FIRST PHASE CONNECTION";
+		}
+		else if(connection instanceof SecondPhaseConnection)
+		{
+			return "SECOND PHASE CONNECTION";
+		}
+		else if(connection instanceof PendingConnection)
+		{
+			return "PENDING CONNECTION";
+		}
+		else if(connection instanceof DirectConnection)
+		{
+			return "DIRECT CONNECTION";
+		}
+		else if(connection instanceof ServerConnection)
+		{
+			return "SERVER CONNECTION";
+		}
+		else if(connection == null)
+		{
+			return "NULL CONNECTION";
+		}
+		else
+		{
+			return "UNKNOWN CONNECTION";
+		}
 	}
 
 	public void shutdown()

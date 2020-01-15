@@ -4,7 +4,6 @@ import ru.nsu.g.a.lyamin.socksProxy.ConnectionSelector;
 
 import java.io.IOException;
 import java.nio.channels.AsynchronousCloseException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 

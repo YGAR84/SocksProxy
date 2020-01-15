@@ -8,7 +8,6 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
@@ -36,7 +35,7 @@ public class SecondPhaseConnection extends PhaseConnection
 	public SecondPhaseConnection(ConnectionSelector connectionSelector, SocketChannel channel)
 	{
 		super(connectionSelector, channel);
-		//System.out.println("SECOND PHASE CTOR");
+		System.out.println("SECOND PHASE CTOR");
 	}
 
 	@Override
@@ -61,7 +60,7 @@ public class SecondPhaseConnection extends PhaseConnection
 				return;
 			}
 
-			if (!checkReaden()) return;
+			if (!checkRead()) return;
 
 			byte[] secondPhaseRequest = new byte[buffer.position()];
 			System.arraycopy(buffer.array(), 0, secondPhaseRequest, 0, secondPhaseRequest.length);
@@ -139,6 +138,9 @@ public class SecondPhaseConnection extends PhaseConnection
 				dnsConnection.resolveAddress(addressBytes, this);
 			}
 
+			//connectionSelector.disableOpt(channel, SelectionKey.OP_READ);
+
+
 //            connectionSelector.registerConnection(channel, this, 0);
 			key.cancel();
 			return;
@@ -192,7 +194,7 @@ public class SecondPhaseConnection extends PhaseConnection
 		}
 	}
 
-	private boolean checkReaden()
+	private boolean checkRead()
 	{
 		if (buffer.position() < 6) return false;
 
@@ -211,8 +213,9 @@ public class SecondPhaseConnection extends PhaseConnection
 		return true;
 	}
 
-	public void setIsConnected(boolean flag, PendingConnection _pendingConnection) throws ClosedChannelException
+	public void setIsConnected(boolean flag, PendingConnection _pendingConnection)
 	{
+		System.out.println("SET IS CONNECTED: " + "flag: " + flag + " " + (_pendingConnection == null));
 		if (!flag)
 		{
 			error = 0x04;
@@ -223,7 +226,7 @@ public class SecondPhaseConnection extends PhaseConnection
 		createAnswer();
 	}
 
-	public void createPending(SocketChannel sc, InetSocketAddress isa) throws ClosedChannelException
+	public void createPending(SocketChannel sc, InetSocketAddress isa) //throws ClosedChannelException
 	{
 		try
 		{
@@ -238,6 +241,8 @@ public class SecondPhaseConnection extends PhaseConnection
 
 	public void setIpResolved(boolean ipResolved, InetAddress resolvedIp)
 	{
+
+		System.out.println("RESOLVED");
 		if (isResolved) return;
 
 		try
@@ -273,10 +278,11 @@ public class SecondPhaseConnection extends PhaseConnection
 		return error != (byte) 0x00;
 	}
 
-	private void createAnswer() throws ClosedChannelException
+	private void createAnswer()// throws ClosedChannelException
 	{
 		//System.out.println("SECOND PHASE CREATE ANSWER");
-		connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
+//		connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
+		connectionSelector.enableOpt(channel, SelectionKey.OP_WRITE);
 
 		InetSocketAddress remoteAddress = null;
 		try

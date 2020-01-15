@@ -88,16 +88,16 @@ public class ConnectionBuffer
 	{
 		if(directConnection == null) return;
 
-		directConnection.connectionSelector.registerConnection(reader.getChannel(), reader,
-				reader.getChannel().validOps() | opt);
+		directConnection.connectionSelector.enableOpt(reader.getChannel(), opt);
 	}
 
 	private void disableOption(DirectConnection directConnection, int opt)
 	{
 		if(directConnection == null) return;
 
-		directConnection.connectionSelector.registerConnection(reader.getChannel(), reader,
-				reader.getChannel().validOps() & ~opt);
+		directConnection.connectionSelector.disableOpt(reader.getChannel(), opt);
+//		directConnection.connectionSelector.registerConnection(reader.getChannel(), reader,
+//				reader.getChannel().validOps() & ~opt);
 	}
 
 
@@ -107,12 +107,15 @@ public class ConnectionBuffer
 
 		long read = channel.read(buffers);
 
+		System.out.println("READ FROM CHANNEL: " + read);
+
 		filled += read;
 
 		if (read == -1)
 		{
 			//System.out.println("EOF");
 			shutdown = true;
+			disableOption(reader, SelectionKey.OP_READ);
 			return false;
 		}
 
@@ -150,11 +153,15 @@ public class ConnectionBuffer
 
 		long written = channel.write(buffers);
 
+		System.out.println("WRITTEN TO CHANNEL: " + written);
+
 		filled -= written;
 
 		if (shutdown && (written == 0))
 		{
+			System.out.println("SHUTDOWN OUTPUT");
 			channel.shutdownOutput();
+			disableOption(writer, SelectionKey.OP_WRITE);
 			return;
 		}
 
@@ -168,7 +175,7 @@ public class ConnectionBuffer
 		if(written > 0)
 		{
 			enableOption(reader, SelectionKey.OP_READ);
-			writer.connectionSelector.registerConnection(writer.getChannel(), writer, writer.getChannel().validOps() | SelectionKey.OP_READ);
+//			writer.connectionSelector.registerConnection(writer.getChannel(), writer, writer.getChannel().validOps() | SelectionKey.OP_READ);
 		}
 
 

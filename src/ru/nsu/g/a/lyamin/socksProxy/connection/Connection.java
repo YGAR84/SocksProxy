@@ -19,7 +19,7 @@ public abstract class Connection
 
 	public void terminate(SelectionKey key)
 	{
-		key.cancel();
+		//key.cancel();
 		connectionSelector.deleteConnection((AbstractSelectableChannel) key.channel());
 	}
 

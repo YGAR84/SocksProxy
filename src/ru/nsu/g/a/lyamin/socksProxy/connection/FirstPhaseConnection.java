@@ -4,14 +4,13 @@ import ru.nsu.g.a.lyamin.socksProxy.ConnectionSelector;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 
 public class FirstPhaseConnection extends PhaseConnection
 {
 
-	int answerWrittenAll = 0;
+	private int answerWrittenAll = 0;
 
 	private ByteBuffer buffer = ByteBuffer.wrap(new byte[257]);
 
@@ -20,7 +19,7 @@ public class FirstPhaseConnection extends PhaseConnection
 	public FirstPhaseConnection(ConnectionSelector connectionSelector, SocketChannel channel)
 	{
 		super(connectionSelector, channel);
-		//System.out.println("FIRST PHASE CTOR");
+		System.out.println("FIRST PHASE CTOR");
 	}
 
 	@Override
@@ -46,7 +45,7 @@ public class FirstPhaseConnection extends PhaseConnection
 				terminate(key);
 			}
 
-			int numOfModes = (int) buffer.get(1);
+//			int numOfModes = (int) buffer.get(1);
 
 			boolean hasAuth = false;
 			for (int i = 2; i < buffer.position(); ++i)
@@ -77,6 +76,7 @@ public class FirstPhaseConnection extends PhaseConnection
 
 			SecondPhaseConnection secondPhaseConnection = new SecondPhaseConnection(connectionSelector, channel);
 			connectionSelector.registerConnection(channel, secondPhaseConnection, SelectionKey.OP_READ);
+			//connectionSelector.disableOpt(channel, SelectionKey.OP_WRITE);
 
 		}
 	}
@@ -90,8 +90,10 @@ public class FirstPhaseConnection extends PhaseConnection
 		return buffer.position() >= 2 + length;
 	}
 
-	private void createAnswer(boolean hasAuth) throws ClosedChannelException
+	private void createAnswer(boolean hasAuth)
 	{
+//		connectionSelector.disableOpt(channel, SelectionKey.OP_READ);
+//		connectionSelector.enableOpt(channel, SelectionKey.OP_WRITE);
 		connectionSelector.registerConnection(channel, this, SelectionKey.OP_WRITE);
 		answer[0] = 0x05;
 		answer[1] = (byte) ((hasAuth) ? 0x00 : 0xFF);
